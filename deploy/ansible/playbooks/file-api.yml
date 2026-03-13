@@ -1,0 +1,53 @@
+---
+# Update File API Only
+
+- name: Update File API
+  hosts: openclaw
+  become: true
+  gather_facts: false
+
+  handlers:
+    - import_tasks: handlers/main.yml
+
+  tasks:
+    - name: Copy File API source
+      synchronize:
+        src: ../../file-api/
+        dest: "{{ deploy_dir }}/file-api/"
+        delete: yes
+        rsync_opts:
+          - "--exclude=node_modules"
+          - "--exclude=.git"
+
+    - name: Set ownership
+      file:
+        path: "{{ deploy_dir }}/file-api"
+        owner: openclaw
+        group: openclaw
+        recurse: yes
+
+    - name: Rebuild File API container
+      community.docker.docker_compose_v2:
+        project_src: "{{ deploy_dir }}"
+        build: always
+        services:
+          - file-api
+      become_user: openclaw
+
+    - name: Restart File API
+      community.docker.docker_compose_v2:
+        project_src: "{{ deploy_dir }}"
+        state: restarted
+        services:
+          - file-api
+      become_user: openclaw
+
+    - name: Wait for File API to be healthy
+      uri:
+        url: http://localhost:3001/health
+        method: GET
+        timeout: 5
+      register: result
+      until: result.status == 200
+      retries: 10
+      delay: 3

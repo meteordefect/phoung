@@ -1,0 +1,48 @@
+---
+- name: Backup Phoung Data
+  hosts: control_plane
+  become: yes
+  
+  vars:
+    backup_dir: /root/backups
+    timestamp: "{{ ansible_date_time.iso8601_basic_short }}"
+    backup_file: "phoung-backup-{{ timestamp }}.tar.gz"
+  
+  tasks:
+    - name: Create backup directory
+      file:
+        path: "{{ backup_dir }}"
+        state: directory
+        mode: '0700'
+
+    - name: Dump PostgreSQL database
+      shell: >
+        docker exec phoung-postgres pg_dump 
+        -U {{ lookup('env', 'POSTGRES_USER') }} 
+        {{ lookup('env', 'POSTGRES_DB') }} 
+        > {{ backup_dir }}/postgres-{{ timestamp }}.sql
+
+    - name: Copy OpenClaw data
+      synchronize:
+        src: "{{ openclaw_data_path }}/"
+        dest: "{{ backup_dir }}/openclaw-data-{{ timestamp }}/"
+        mode: pull
+
+    - name: Create compressed backup archive
+      archive:
+        path:
+          - "{{ backup_dir }}/postgres-{{ timestamp }}.sql"
+          - "{{ backup_dir }}/openclaw-data-{{ timestamp }}"
+        dest: "{{ backup_dir }}/{{ backup_file }}"
+        format: gz
+        remove: yes
+
+    - name: Fetch backup to local machine
+      fetch:
+        src: "{{ backup_dir }}/{{ backup_file }}"
+        dest: "./backups/"
+        flat: yes
+
+    - name: Display backup info
+      debug:
+        msg: "Backup created: {{ backup_file }}"

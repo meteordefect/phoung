@@ -1,0 +1,38 @@
+---
+- name: Check Phoung Status
+  hosts: control_plane
+  become: yes
+  
+  tasks:
+    - name: Check Docker service
+      systemd:
+        name: docker
+      register: docker_status
+
+    - name: Check Nginx service
+      systemd:
+        name: nginx
+      register: nginx_status
+
+    - name: Check running containers
+      shell: docker ps --format "table {{{{.Names}}}}\t{{{{.Status}}}}\t{{{{.Ports}}}}"
+      register: containers
+
+    - name: Check Control API health
+      uri:
+        url: http://localhost:3001/api/health
+        return_content: yes
+      register: api_health
+      ignore_errors: yes
+
+    - name: Display status
+      debug:
+        msg: |
+          Docker: {{ docker_status.status.ActiveState }}
+          Nginx: {{ nginx_status.status.ActiveState }}
+          
+          Containers:
+          {{ containers.stdout }}
+          
+          Control API Health:
+          {{ api_health.json | default('Not available') }}

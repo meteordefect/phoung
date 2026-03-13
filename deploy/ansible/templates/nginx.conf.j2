@@ -1,0 +1,137 @@
+# Phoung Nginx Configuration
+#
+# Dashboard access: SSH tunnel only (localhost:8080)
+#   ssh -N -L 8080:127.0.0.1:8080 root@{{ domain }}
+#   Then open: http://localhost:8080
+#
+# Agent API endpoints: publicly accessible on port 443 (bearer token secured)
+
+# --- SSH-TUNNEL-ONLY: Dashboard + full API ---
+# Bound to 127.0.0.1 — unreachable from the public internet.
+# Access exclusively via SSH tunnel.
+server {
+    listen 127.0.0.1:8080;
+    server_name localhost;
+
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    client_max_body_size 10M;
+
+    gzip on;
+    gzip_types text/plain text/css application/json application/javascript text/xml application/xml;
+    gzip_min_length 1000;
+
+    # All API endpoints (no rate limiting needed — localhost only)
+    location /api/ {
+        proxy_pass http://127.0.0.1:3001/api/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # OpenClaw Gateway WebSocket (dashboard chat)
+    location /gateway/ws {
+        proxy_pass http://127.0.0.1:18789/;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 86400s;
+        proxy_send_timeout 86400s;
+        proxy_connect_timeout 60s;
+        proxy_buffering off;
+    }
+
+    # Gateway health check
+    location /gateway/health {
+        proxy_pass http://127.0.0.1:18789/health;
+        proxy_http_version 1.1;
+    }
+
+    # Dashboard SPA
+    location / {
+        proxy_pass http://127.0.0.1:3000/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+
+    access_log /var/log/nginx/phoung-tunnel-access.log;
+    error_log /var/log/nginx/phoung-tunnel-error.log;
+}
+
+limit_req_zone $binary_remote_addr zone=agent_api:10m rate=10r/s;
+
+# --- PUBLIC: Agent API endpoints only ---
+# Exposes only the agent register/heartbeat/command endpoints that remote agents need.
+# No dashboard. Bearer token auth is enforced by the control-api itself.
+server {
+    listen 80;
+    server_name {{ domain }};
+
+    # Let's Encrypt ACME challenge (for SSL cert renewal)
+    location ^~ /.well-known/acme-challenge/ {
+        default_type "text/plain";
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://$server_name$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl http2;
+    server_name {{ domain }};
+
+    ssl_certificate /etc/letsencrypt/live/{{ domain }}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/{{ domain }}/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384;
+    ssl_prefer_server_ciphers off;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 10m;
+
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Content-Type-Options "nosniff" always;
+
+    # Agent registration and heartbeat (bearer token secured by control-api)
+    location ~ ^/api/agents/(register|heartbeat) {
+        limit_req zone=agent_api burst=20 nodelay;
+        proxy_pass http://127.0.0.1:3001;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Agent command polling (bearer token secured by control-api)
+    location ~ ^/api/commands/(pending|[^/]+/(accept|result)) {
+        limit_req zone=agent_api burst=20 nodelay;
+        proxy_pass http://127.0.0.1:3001;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Everything else is blocked — use SSH tunnel for dashboard access
+    location / {
+        return 403;
+    }
+
+    access_log /var/log/nginx/phoung-public-access.log;
+    error_log /var/log/nginx/phoung-public-error.log;
+}

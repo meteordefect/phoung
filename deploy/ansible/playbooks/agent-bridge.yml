@@ -1,0 +1,36 @@
+---
+- name: Deploy Agent Bridge
+  hosts: control_plane
+  become: yes
+  
+  tasks:
+    - name: Copy Agent Bridge source
+      synchronize:
+        src: ../../agent-bridge/
+        dest: "{{ project_dir }}/agent-bridge/"
+        delete: yes
+        rsync_opts:
+          - "--exclude=node_modules"
+          - "--exclude=dist"
+
+    - name: Build Agent Bridge image
+      shell: cd {{ project_dir }} && docker compose build agent-bridge
+      environment:
+        DOCKER_BUILDKIT: "1"
+
+    - name: Start Agent Bridge with profile
+      shell: cd {{ project_dir }} && docker compose --profile agent-bridge up -d agent-bridge
+      environment:
+        COMPOSE_HTTP_TIMEOUT: "200"
+
+    - name: Wait for Agent Bridge to start
+      pause:
+        seconds: 5
+
+    - name: Check Agent Bridge logs
+      shell: cd {{ project_dir }} && docker compose logs --tail=20 agent-bridge
+      register: agent_logs
+
+    - name: Display Agent Bridge logs
+      debug:
+        var: agent_logs.stdout_lines

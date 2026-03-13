@@ -1,0 +1,18 @@
+---
+- name: Run Database Migrations
+  hosts: control_plane
+  become: yes
+  
+  tasks:
+    - name: Check if Control API container is running
+      shell: docker ps --filter "name=phoung-control-api" --format "{% raw %}{{.Names}}{% endraw %}"
+      register: container_check
+
+    - name: Run migrations
+      shell: docker exec phoung-control-api node dist/db/migrate.js
+      when: container_check.stdout != ""
+      register: migration_result
+
+    - name: Display migration result
+      debug:
+        var: migration_result.stdout_lines

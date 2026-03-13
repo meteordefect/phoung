@@ -1,0 +1,219 @@
+---
+- hosts: control_plane
+  tasks:
+    - name: Clean up corrupted Docker repo configurations
+      shell: |
+        rm -f /etc/apt/sources.list.d/docker.list
+        rm -f /etc/apt/sources.list.d/download_docker_com_linux_ubuntu*.list
+        # Also check for any docker entries in main sources.list
+        sed -i '/download.docker.com/d' /etc/apt/sources.list || true
+
+    - name: Install Docker prerequisites
+      apt:
+        name:
+          - ca-certificates
+          - curl
+          - gnupg
+        state: present
+        update_cache: yes
+
+    - name: Add Docker GPG key
+      shell: |
+        install -m 0755 -d /etc/apt/keyrings
+        curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+        chmod a+r /etc/apt/keyrings/docker.asc
+      args:
+        creates: /etc/apt/keyrings/docker.asc
+
+    - name: Add Docker apt repository
+      shell: |
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | tee /etc/apt/sources.list.d/docker.list
+      register: docker_repo_added
+
+    - name: Install Docker CE
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+        state: present
+        update_cache: yes
+
+    - name: Ensure Docker is running
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Ensure deploy directory exists
+      file:
+        path: /opt/phoung
+        state: directory
+        mode: '0755'
+
+    - name: Sync project files from repo root
+      synchronize:
+        src: "{{ playbook_dir }}/../../../"
+        dest: /opt/phoung/
+        rsync_opts:
+          - "--exclude=.git"
+          - "--exclude=node_modules"
+          - "--exclude=deploy/control-api"
+          - "--exclude=deploy/agent-bridge"
+          - "--exclude=deploy/dashboard"
+          - "--exclude=openclaw-source"
+          - "--exclude=openclaw"
+          - "--exclude=docs"
+          - "--exclude=*.pyc"
+          - "--exclude=__pycache__"
+          - "--exclude=main-agent/dist"
+          - "--exclude=main-agent/node_modules"
+
+    - name: Generate random PostgreSQL password
+      shell: openssl rand -base64 32 | tr -d "=+/" | cut -c1-32
+      register: postgres_password
+      when: not ansible_check_mode
+
+    - name: Generate environment file with required variables
+      copy:
+        dest: /opt/phoung/.env
+        content: |
+          # Kimi For Coding (pi-mono provider: kimi-coding)
+          KIMI_API_KEY={{ lookup('env', 'KIMI_API_KEY') | default(lookup('env', 'MOONSHOT_API_KEY'), true) | default('', true) }}
+
+          # ZAI / GLM (pi-mono provider: zai)
+          ZAI_API_KEY={{ lookup('env', 'ZAI_API_KEY') | default(lookup('env', 'ZHIPU_API_KEY'), true) | default('', true) }}
+
+          # Anthropic (optional)
+          ANTHROPIC_API_KEY={{ lookup('env', 'ANTHROPIC_API_KEY') | default('', true) }}
+
+          # Default model (pi-mono provider/model format, empty = auto-select)
+          DEFAULT_MODEL={{ lookup('env', 'DEFAULT_MODEL') | default('', true) }}
+
+          # GitHub
+          GITHUB_TOKEN={{ lookup('env', 'GITHUB_TOKEN') | default('', true) }}
+
+          # Sub-agent
+          SUBAGENT_MODEL={{ lookup('env', 'SUBAGENT_MODEL') | default('zai/glm-4', true) }}
+          SUBAGENT_IMAGE=phoung/subagent:latest
+          SUBAGENT_MEMORY_LIMIT=2g
+          SUBAGENT_CPUS=2
+          MAX_CONCURRENT_SUBAGENTS=3
+
+          # Repos & workspaces
+          REPOS_DIR=/app/repos
+          WORKSPACES_DIR=/tmp/clawdeploy-workspaces
+          SUBAGENT_RUNTIME=runsc
+
+          # API
+          API_HOST=0.0.0.0
+          API_PORT=8000
+          MEMORY_DIR=/app/memory
+        mode: '0600'
+
+    - name: Stop old stack if running
+      command: docker compose down --remove-orphans
+      args:
+        chdir: /opt/phoung
+      ignore_errors: yes
+
+    - name: Stop any control-plane stack that may hold ports
+      command: docker compose down --remove-orphans
+      args:
+        chdir: /opt/phoung/deploy
+      ignore_errors: yes
+
+    - name: Kill any stale containers on ports used by v2 stack
+      shell: |
+        for port in 8000 3000 8080; do
+          container=$(docker ps -q --filter "publish=$port" 2>/dev/null)
+          if [ -n "$container" ]; then
+            docker stop $container && docker rm $container || true
+          fi
+        done
+      ignore_errors: yes
+
+    - name: Build and start v2 services
+      command: docker compose up -d --build
+      args:
+        chdir: /opt/phoung
+
+    - name: Build sub-agent image
+      command: docker build -t phoung/subagent:latest ./subagent
+      args:
+        chdir: /opt/phoung
+
+    - name: Install gVisor (runsc)
+      shell: |
+        set -e
+        if command -v runsc &>/dev/null; then
+          echo "gVisor already installed"
+          exit 0
+        fi
+        ARCH=$(uname -m)
+        URL="https://storage.googleapis.com/gvisor/releases/release/latest/${ARCH}"
+        wget -q "${URL}/runsc" "${URL}/containerd-shim-runsc-v1" -P /tmp/gvisor/
+        install -o root -g root -m 0755 /tmp/gvisor/runsc /usr/local/bin/
+        install -o root -g root -m 0755 /tmp/gvisor/containerd-shim-runsc-v1 /usr/local/bin/
+        rm -rf /tmp/gvisor
+      args:
+        creates: /usr/local/bin/runsc
+
+    - name: Configure Docker to use gVisor runtime
+      copy:
+        dest: /etc/docker/daemon.json
+        content: |
+          {
+            "runtimes": {
+              "runsc": {
+                "path": "/usr/local/bin/runsc"
+              }
+            }
+          }
+        mode: '0644'
+      register: docker_daemon_config
+
+    - name: Restart Docker if daemon config changed
+      service:
+        name: docker
+        state: restarted
+      when: docker_daemon_config.changed
+
+    - name: Ensure repos directory exists
+      file:
+        path: /opt/phoung/repos
+        state: directory
+        mode: '0755'
+
+    - name: Ensure workspaces directory exists
+      file:
+        path: /tmp/clawdeploy-workspaces
+        state: directory
+        mode: '0755'
+
+    - name: Install hourly cron - wake Phoung
+      cron:
+        name: "Phoung hourly: wake Phoung"
+        minute: "0"
+        hour: "*"
+        job: "curl -s -X POST http://127.0.0.1:8000/cron/wake >> /var/log/phoung-cron.log 2>&1"
+
+    - name: Remove old Python cron jobs if present
+      cron:
+        name: "{{ item }}"
+        state: absent
+      loop:
+        - "Phoung hourly: wake Pi"
+        - "Phoung daily: housekeeping"
+
+    - name: Verify services are running
+      command: docker compose ps
+      args:
+        chdir: /opt/phoung
+      register: docker_ps
+
+    - name: Show service status
+      debug:
+        var: docker_ps.stdout_lines

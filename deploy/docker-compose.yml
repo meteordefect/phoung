@@ -1,0 +1,151 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: phoung-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - phoung
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  control-api:
+    build:
+      context: ./control-api
+      dockerfile: Dockerfile
+    container_name: phoung-control-api
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3001:3001"
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      PORT: 3001
+      OPENCLAW_DATA_PATH: /openclaw-data
+    volumes:
+      - openclaw-data:/openclaw-data
+    networks:
+      - phoung
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3001/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+
+  dashboard:
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL}
+        VITE_GATEWAY_WS_URL: ${VITE_GATEWAY_WS_URL}
+        VITE_GATEWAY_TOKEN: ${VITE_GATEWAY_TOKEN}
+    container_name: phoung-dashboard
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"
+    networks:
+      - phoung
+    depends_on:
+      control-api:
+        condition: service_healthy
+
+  agent-bridge:
+    build:
+      context: ./agent-bridge
+      dockerfile: Dockerfile
+    container_name: phoung-agent-bridge
+    restart: unless-stopped
+    environment:
+      CONTROL_API_URL: http://control-api:3001/api
+      AGENT_NAME: ${AGENT_NAME:-Local OpenClaw Agent}
+      AGENT_DESCRIPTION: ${AGENT_DESCRIPTION:-OpenClaw agent with full skill suite}
+      OPENCLAW_GATEWAY_URL: ${OPENCLAW_GATEWAY_URL:-ws://host.docker.internal:18789}
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-}
+      OPENCLAW_MODE: ${OPENCLAW_MODE:-gateway}
+      OPENCLAW_SKILLS_PATH: ${OPENCLAW_SKILLS_PATH:-/openclaw/skills}
+      ZHIPU_API_KEY: ${ZHIPU_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      MOONSHOT_API_KEY: ${MOONSHOT_API_KEY:-}
+      OPENCLAW_MODEL: ${OPENCLAW_MODEL:-glm-4}
+      HEARTBEAT_INTERVAL_MS: ${HEARTBEAT_INTERVAL_MS:-30000}
+      COMMAND_POLL_INTERVAL_MS: ${COMMAND_POLL_INTERVAL_MS:-5000}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    networks:
+      - phoung
+    depends_on:
+      control-api:
+        condition: service_healthy
+    profiles:
+      - agent-bridge
+
+  # OpenClaw Gateway - for dashboard chat feature
+  # Start with: docker compose --profile openclaw-gateway up -d openclaw-gateway
+  openclaw-gateway:
+    build:
+      context: ./openclaw-source
+      dockerfile: Dockerfile
+      args:
+        OPENCLAW_DOCKER_APT_PACKAGES: ""
+    image: openclaw/openclaw:${OPENCLAW_VERSION:-latest}
+    container_name: openclaw-gateway
+    restart: unless-stopped
+    working_dir: /app
+    entrypoint: []
+    user: "0:0"
+    environment:
+      HOME: /home/node
+      TERM: xterm-256color
+      OPENCLAW_AUTH_MODE: ${OPENCLAW_AUTH_MODE:-password}
+      OPENCLAW_GATEWAY_PASSWORD: ${OPENCLAW_GATEWAY_PASSWORD:-}
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-}
+      OPENCLAW_CONTROL_UI_BASE_PATH: /dashboard
+      ZAI_API_KEY: ${ZHIPU_API_KEY:-}
+    volumes:
+      - openclaw-data:/home/node/.openclaw
+    ports:
+      - "127.0.0.1:18789:18789"
+    command:
+      [
+        "node",
+        "openclaw.mjs",
+        "gateway",
+        "--allow-unconfigured",
+        "--bind",
+        "lan",
+        "--port",
+        "18789",
+      ]
+    networks:
+      - phoung
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:18789/health > /dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    profiles:
+      - openclaw-gateway
+
+volumes:
+  postgres-data:
+    driver: local
+  openclaw-data:
+    driver: local
+
+networks:
+  phoung:
+    driver: bridge

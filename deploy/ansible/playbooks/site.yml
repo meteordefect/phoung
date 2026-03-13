@@ -1,0 +1,205 @@
+---
+- name: Deploy Phoung Control Plane
+  hosts: control_plane
+  become: yes
+  
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Install required packages
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gnupg
+          - lsb-release
+          - python3-pip
+          - git
+          - htop
+          - vim
+          - apache2-utils
+          - certbot
+          - python3-certbot-nginx
+        state: present
+
+    - name: Add Docker GPG key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+
+    - name: Add Docker repository
+      apt_repository:
+        repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+        state: present
+
+    - name: Install Docker
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+        state: present
+
+    - name: Ensure Docker service is running
+      systemd:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Create project directory
+      file:
+        path: "{{ project_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Create OpenClaw data directory
+      file:
+        path: "{{ openclaw_data_path }}"
+        state: directory
+        mode: '0755'
+
+    - name: Create repos base directory
+      file:
+        path: /opt/repos
+        state: directory
+        mode: '0755'
+
+    - name: Copy docker-compose.yml
+      copy:
+        src: ../../docker-compose.yml
+        dest: "{{ compose_file }}"
+        mode: '0644'
+
+    - name: Copy .env file
+      copy:
+        src: ../../.env
+        dest: "{{ env_file }}"
+        mode: '0600'
+
+    - name: Copy Control API source
+      synchronize:
+        src: ../../control-api/
+        dest: "{{ project_dir }}/control-api/"
+        delete: yes
+        rsync_opts:
+          - "--exclude=node_modules"
+          - "--exclude=dist"
+
+    - name: Copy Dashboard source
+      synchronize:
+        src: ../../dashboard/
+        dest: "{{ project_dir }}/dashboard/"
+        delete: yes
+        rsync_opts:
+          - "--exclude=node_modules"
+          - "--exclude=dist"
+
+    - name: Copy Agent Bridge source
+      synchronize:
+        src: ../../agent-bridge/
+        dest: "{{ project_dir }}/agent-bridge/"
+        delete: yes
+        rsync_opts:
+          - "--exclude=node_modules"
+          - "--exclude=dist"
+
+    - name: Copy OpenClaw source (for building gateway image)
+      synchronize:
+        src: ../../../openclaw-source/
+        dest: "{{ project_dir }}/openclaw-source/"
+        delete: yes
+        rsync_opts:
+          - "--exclude=node_modules"
+          - "--exclude=dist"
+          - "--exclude=.git"
+
+    - name: Install Nginx
+      apt:
+        name: nginx
+        state: present
+
+    - name: Copy Nginx configuration
+      template:
+        src: ../templates/nginx.conf.j2
+        dest: /etc/nginx/sites-available/phoung
+        mode: '0644'
+      notify: Reload Nginx
+
+    - name: Enable Nginx site
+      file:
+        src: /etc/nginx/sites-available/phoung
+        dest: /etc/nginx/sites-enabled/phoung
+        state: link
+      notify: Reload Nginx
+
+    - name: Remove default Nginx site
+      file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+      notify: Reload Nginx
+
+    - name: Create directory for Let's Encrypt challenges
+      file:
+        path: /var/www/certbot
+        state: directory
+        mode: '0755'
+
+    - name: Stop any running containers
+      shell: cd {{ project_dir }} && docker compose down || true
+      ignore_errors: yes
+
+    - name: Pull/build Docker images
+      shell: cd {{ project_dir }} && docker compose build --no-cache
+      environment:
+        DOCKER_BUILDKIT: "1"
+
+    - name: Start Docker Compose services (including agent-bridge and gateway)
+      shell: cd {{ project_dir }} && docker compose --profile agent-bridge --profile openclaw-gateway up -d
+      environment:
+        COMPOSE_HTTP_TIMEOUT: "200"
+
+    - name: Wait for services to be healthy
+      shell: cd {{ project_dir }} && docker compose ps --format json | jq -r '.[].Health' | grep -v healthy || true
+      register: health_check
+      retries: 10
+      delay: 5
+      until: health_check.stdout == ""
+
+    - name: Configure OpenClaw gateway model (ZAI/GLM-4.7)
+      shell: >
+        cd {{ project_dir }} &&
+        docker exec openclaw-gateway node openclaw.mjs models set zai/glm-4.7
+      ignore_errors: yes
+
+    - name: Obtain SSL certificate from Let's Encrypt
+      shell: >
+        certbot certonly --webroot
+        --webroot-path /var/www/certbot
+        --email "{{ lookup('env', 'SSL_EMAIL') | default('admin@' + lookup('env', 'DOMAIN'), true) }}"
+        --agree-tos
+        --non-interactive
+        -d "{{ lookup('env', 'DOMAIN') }}"
+      register: certbot_result
+      failed_when: false
+      changed_when: certbot_result.rc == 0
+
+    - name: Set up SSL certificate renewal
+      cron:
+        name: "Renew SSL certificate"
+        job: "certbot renew --quiet --post-hook 'systemctl reload nginx'"
+        hour: "3"
+        minute: "0"
+        user: root
+        state: present
+
+  handlers:
+    - name: Reload Nginx
+      systemd:
+        name: nginx
+        state: reloaded
