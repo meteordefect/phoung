@@ -3,7 +3,9 @@ import {
   GitBranch, ExternalLink, Clock, AlertCircle,
   CheckCircle, XCircle, Loader, ChevronDown, ChevronUp,
   Bot, MessageSquare, ArrowRight, Copy, Check, Send,
+  Square, RotateCcw,
 } from 'lucide-react';
+import { ElapsedTime, DiffStats } from './MonitorView';
 import { Badge } from './components/ui/badge';
 import { Button } from './components/ui/button';
 import { api } from './api';
@@ -324,6 +326,8 @@ interface TaskDetailViewProps {
 export function TaskDetailView({ task, onRefresh }: TaskDetailViewProps) {
   const [merging, setMerging] = useState(false);
   const [rejecting, setRejecting] = useState(false);
+  const [stopping, setStopping] = useState(false);
+  const [retryingTask, setRetryingTask] = useState(false);
 
   const status = task.meta.status as TaskStatus;
 
@@ -363,6 +367,32 @@ export function TaskDetailView({ task, onRefresh }: TaskDetailViewProps) {
     }
   };
 
+  const handleStop = async () => {
+    setStopping(true);
+    try {
+      await api.tasks.stop(task.meta.id);
+      eventBus.emit('task:updated');
+      onRefresh();
+    } catch (err: any) {
+      alert(`Stop failed: ${err.message}`);
+    } finally {
+      setStopping(false);
+    }
+  };
+
+  const handleRetry = async () => {
+    setRetryingTask(true);
+    try {
+      await api.tasks.retry(task.meta.id);
+      eventBus.emit('task:updated');
+      onRefresh();
+    } catch (err: any) {
+      alert(`Retry failed: ${err.message}`);
+    } finally {
+      setRetryingTask(false);
+    }
+  };
+
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between px-6 py-3 border-b border-border flex-shrink-0 bg-card">
@@ -395,25 +425,58 @@ export function TaskDetailView({ task, onRefresh }: TaskDetailViewProps) {
                   {timeAgo(task.meta.created)}
                 </span>
               )}
+              {status === 'coding' && task.meta.created && (
+                <span className="flex items-center gap-1 text-xs text-amber-400 font-medium">
+                  <Loader size={10} className="animate-spin" />
+                  <ElapsedTime since={task.meta.created} />
+                </span>
+              )}
+              {task.meta.additions != null && (
+                <DiffStats additions={task.meta.additions as number} deletions={task.meta.deletions as number ?? 0} />
+              )}
             </div>
           </div>
         </div>
 
-        {(status === 'ready_to_merge' || status === 'pr_open') && (
-          <div className="flex items-center gap-2 flex-shrink-0">
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {status === 'coding' && (
             <Button
               size="sm"
-              onClick={handleMerge}
-              disabled={merging || !task.meta.pr}
-              className="bg-done hover:bg-done/90 text-white"
+              variant="destructive"
+              onClick={handleStop}
+              disabled={stopping}
             >
-              {merging ? 'Merging...' : 'Merge PR'}
+              {stopping ? <Loader size={12} className="animate-spin mr-1" /> : <Square size={12} className="mr-1" />}
+              {stopping ? 'Stopping...' : 'Stop Agent'}
             </Button>
-            <Button size="sm" variant="destructive" onClick={handleReject} disabled={rejecting}>
-              {rejecting ? 'Rejecting...' : 'Reject'}
+          )}
+          {status === 'failed' && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleRetry}
+              disabled={retryingTask}
+            >
+              {retryingTask ? <Loader size={12} className="animate-spin mr-1" /> : <RotateCcw size={12} className="mr-1" />}
+              {retryingTask ? 'Retrying...' : 'Retry'}
             </Button>
-          </div>
-        )}
+          )}
+          {(status === 'ready_to_merge' || status === 'pr_open') && (
+            <>
+              <Button
+                size="sm"
+                onClick={handleMerge}
+                disabled={merging || !task.meta.pr}
+                className="bg-done hover:bg-done/90 text-white"
+              >
+                {merging ? 'Merging...' : 'Merge PR'}
+              </Button>
+              <Button size="sm" variant="destructive" onClick={handleReject} disabled={rejecting}>
+                {rejecting ? 'Rejecting...' : 'Reject'}
+              </Button>
+            </>
+          )}
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-6 space-y-5">

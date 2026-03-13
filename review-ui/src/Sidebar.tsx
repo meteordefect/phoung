@@ -214,6 +214,8 @@ export function Sidebar({
                 activeTasks.map(task => {
                   const status = task.meta.status as TaskStatus;
                   const isActive = activeView === 'task' && selectedTaskId === task.meta.id;
+                  const adds = task.meta.additions as number | undefined;
+                  const dels = task.meta.deletions as number | undefined;
                   return (
                     <button
                       key={task.meta.id}
@@ -226,6 +228,12 @@ export function Sidebar({
                     >
                       <span className="flex-shrink-0">{STATUS_ICONS[status]}</span>
                       <span className="flex-1 min-w-0 text-sm truncate">{task.meta.id}</span>
+                      {adds != null && (
+                        <span className="flex items-center gap-1 text-[9px] font-mono flex-shrink-0">
+                          <span className="text-green-400">+{adds}</span>
+                          <span className="text-red-400">-{dels ?? 0}</span>
+                        </span>
+                      )}
                       <Badge variant={status} className="text-[9px] px-1.5 py-0 flex-shrink-0">
                         {STATUS_SHORT[status]}
                       </Badge>

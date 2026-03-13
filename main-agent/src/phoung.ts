@@ -11,7 +11,7 @@ import {
 import { MEMORY_DIR, KIMI_API_KEY, ZAI_API_KEY, ANTHROPIC_API_KEY } from "./config.js";
 import { allTools } from "./extension.js";
 import * as memory from "./memory.js";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
 
 export interface StreamEvent {
   type: string;
@@ -61,8 +61,10 @@ async function createSession(conversationId: string): Promise<AgentSession> {
     retry: { enabled: true, maxRetries: 2 },
   });
 
+  const appDir = dirname(MEMORY_DIR);
+
   const { session } = await createAgentSession({
-    cwd: MEMORY_DIR,
+    cwd: appDir,
     sessionManager: SessionManager.create(MEMORY_DIR, SESSION_DIR),
     authStorage,
     modelRegistry,

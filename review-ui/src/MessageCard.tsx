@@ -7,18 +7,21 @@ import type { StreamMessage, MessageBlock } from './types';
 
 const TOOL_CONFIG: Record<string, { icon: typeof Rocket; label: string; accent: string }> = {
   spawn_subagent: { icon: Rocket, label: 'Spawn Sub-Agent', accent: 'blue' },
+  register_project: { icon: Rocket, label: 'Register Project', accent: 'emerald' },
   list_tasks: { icon: RefreshCw, label: 'List Tasks', accent: 'slate' },
   update_task: { icon: RefreshCw, label: 'Update Task', accent: 'amber' },
   ask_human: { icon: AlertCircle, label: 'Ask Human', accent: 'yellow' },
   check_prs: { icon: RefreshCw, label: 'Check PRs', accent: 'slate' },
   create_memory: { icon: Brain, label: 'Create Memory', accent: 'purple' },
   read: { icon: Wrench, label: 'Read File', accent: 'slate' },
-  write: { icon: Wrench, label: 'Write File', accent: 'emerald' },
-  edit: { icon: Wrench, label: 'Edit File', accent: 'amber' },
+  write: { icon: Wrench, label: 'Write', accent: 'emerald' },
+  edit: { icon: Wrench, label: 'Edit', accent: 'amber' },
   bash: { icon: Wrench, label: 'Shell', accent: 'orange' },
+  shell: { icon: Wrench, label: 'Shell', accent: 'orange' },
   grep: { icon: Wrench, label: 'Grep', accent: 'slate' },
   find: { icon: Wrench, label: 'Find', accent: 'slate' },
-  ls: { icon: Wrench, label: 'List Dir', accent: 'slate' },
+  list: { icon: Wrench, label: 'List', accent: 'slate' },
+  ls: { icon: Wrench, label: 'List', accent: 'slate' },
 };
 
 function accentClasses(accent: string) {
@@ -34,15 +37,78 @@ function accentClasses(accent: string) {
   return map[accent] || map.slate;
 }
 
+function toolSummary(name: string | undefined, args: Record<string, unknown> | undefined): string {
+  if (!args) return '';
+  switch (name) {
+    case 'read':
+      return args.path ? String(args.path) : '';
+    case 'write':
+    case 'edit':
+      return args.path ? String(args.path) : '';
+    case 'bash':
+    case 'shell':
+      return args.command ? String(args.command).slice(0, 80) : '';
+    case 'ls':
+    case 'list':
+      return args.path ? String(args.path) : '.';
+    case 'grep':
+    case 'find':
+      return args.pattern ? String(args.pattern) : '';
+    case 'spawn_subagent':
+      return [args.task_id, args.project].filter(Boolean).join(' · ');
+    default: {
+      const keys = Object.keys(args);
+      if (keys.length === 0) return '';
+      if (keys.length <= 2) return keys.map(k => `${k}: ${String(args[k]).slice(0, 40)}`).join(', ');
+      return `${keys.length} params`;
+    }
+  }
+}
+
 function ToolBlock({ block }: { block: MessageBlock }) {
   const [expanded, setExpanded] = useState(false);
   const config = TOOL_CONFIG[block.toolName || ''] || {
     icon: Wrench, label: block.toolName || 'Tool', accent: 'slate',
   };
   const Icon = config.icon;
-  const classes = accentClasses(config.accent);
+  const accent = block.isError ? 'slate' : config.accent;
+  const classes = accentClasses(accent);
   const [textClass, bgClass, borderClass] = classes.split(' ');
   const running = !block.isComplete;
+  const summary = toolSummary(block.toolName, block.toolArgs);
+  const errorBrief = block.isError && block.toolResult
+    ? block.toolResult.split('\n')[0].slice(0, 80)
+    : '';
+
+  if (block.isError && block.isComplete) {
+    return (
+      <div className="rounded-md border px-2.5 py-1 my-1 bg-red-400/5 border-red-400/10">
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="flex items-center gap-2 w-full text-left cursor-pointer"
+        >
+          <XCircle size={11} className="flex-shrink-0 text-red-400/60" />
+          <span className="text-[11px] text-red-400/60">{config.label}</span>
+          {summary && (
+            <span className="text-[10px] text-red-400/40 font-mono truncate max-w-[180px]">{summary}</span>
+          )}
+          {errorBrief && !expanded && (
+            <span className="text-[10px] text-red-400/50 truncate max-w-[200px] ml-auto mr-1">{errorBrief}</span>
+          )}
+          <span className="flex-shrink-0">
+            {expanded
+              ? <ChevronUp size={9} className="text-red-400/40" />
+              : <ChevronDown size={9} className="text-red-400/40" />}
+          </span>
+        </button>
+        {expanded && block.toolResult && (
+          <pre className="text-[10px] text-red-400/70 whitespace-pre-wrap font-mono leading-relaxed max-h-32 overflow-y-auto mt-1 px-1 pb-1">
+            {block.toolResult}
+          </pre>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className={`rounded-md border px-2.5 py-1.5 my-1.5 ${bgClass} ${borderClass}`}>
@@ -52,21 +118,14 @@ function ToolBlock({ block }: { block: MessageBlock }) {
       >
         {running ? (
           <Loader2 size={12} className={`flex-shrink-0 ${textClass} animate-spin`} />
-        ) : block.isError ? (
-          <XCircle size={12} className="flex-shrink-0 text-red-400" />
         ) : (
           <CheckCircle2 size={12} className={`flex-shrink-0 ${textClass}`} />
         )}
         <Icon size={12} className={`flex-shrink-0 ${textClass}`} />
         <span className={`text-xs font-medium ${textClass}`}>{config.label}</span>
-        {block.toolArgs?.task_id != null && (
-          <span className="text-[10px] text-tertiary font-mono">
-            {String(block.toolArgs.task_id)}
-          </span>
-        )}
-        {block.toolArgs?.project != null && (
-          <span className="text-[10px] text-tertiary">
-            {String(block.toolArgs.project)}
+        {summary && (
+          <span className="text-[10px] text-tertiary font-mono truncate max-w-[250px]">
+            {summary}
           </span>
         )}
         <span className="ml-auto flex-shrink-0">
@@ -83,7 +142,7 @@ function ToolBlock({ block }: { block: MessageBlock }) {
             </pre>
           )}
           {block.toolResult && (
-            <pre className={`text-[11px] whitespace-pre-wrap font-mono leading-relaxed max-h-40 overflow-y-auto px-1 ${block.isError ? 'text-red-400' : 'text-secondary'}`}>
+            <pre className="text-[11px] text-secondary whitespace-pre-wrap font-mono leading-relaxed max-h-40 overflow-y-auto px-1">
               {block.toolResult}
             </pre>
           )}
