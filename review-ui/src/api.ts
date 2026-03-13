@@ -19,6 +19,7 @@ function chatStream(
   onEvent: (event: StreamEvent) => void,
   conversationId?: string,
   model?: string,
+  project?: string,
 ) {
   const abortController = new AbortController();
 
@@ -26,7 +27,7 @@ function chatStream(
     const response = await fetch(`${API_URL}/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message, conversation_id: conversationId, model }),
+      body: JSON.stringify({ message, conversation_id: conversationId, model, project }),
       signal: abortController.signal,
     });
 

@@ -21,6 +21,7 @@ interface SessionStats {
 interface ChatViewProps {
   initialConversationId: string | null;
   onConversationCreated: (convId: string) => void;
+  project?: string;
 }
 
 let blockCounter = 0;
@@ -32,7 +33,7 @@ function formatTokens(n: number): string {
   return String(n);
 }
 
-export function ChatView({ initialConversationId, onConversationCreated }: ChatViewProps) {
+export function ChatView({ initialConversationId, onConversationCreated, project }: ChatViewProps) {
   const [messages, setMessages] = useState<StreamMessage[]>([]);
   const [input, setInput] = useState('');
   const [streaming, setStreaming] = useState(false);
@@ -295,6 +296,7 @@ export function ChatView({ initialConversationId, onConversationCreated }: ChatV
         handleStreamEvent,
         conversationId || undefined,
         activeModel || undefined,
+        project,
       );
       abortRef.current = abort;
       await promise;
@@ -419,8 +421,10 @@ export function ChatView({ initialConversationId, onConversationCreated }: ChatV
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-center">
             <Bot size={40} className="text-tertiary opacity-20 mb-3" />
-            <p className="text-sm text-secondary">Start a conversation with Phoung</p>
-            <p className="text-xs text-tertiary mt-1.5">Ask about projects, assign tasks, or check status</p>
+            <p className="text-sm text-secondary">
+              {project ? `Chat with Phoung about ${project}` : 'Start a conversation with Phoung'}
+            </p>
+            <p className="text-xs text-tertiary mt-1.5">Assign tasks, spawn agents, or check status</p>
           </div>
         )}
 

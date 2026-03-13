@@ -2,17 +2,22 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Sidebar } from './Sidebar';
 import { ChatView } from './ChatView';
 import { TaskDetailView } from './TaskDetailView';
-import { MonitorView } from './MonitorView';
+import { DashboardView } from './DashboardView';
 import { ContextPanel } from './ContextPanel';
 import { LogsDrawer } from './LogsDrawer';
 import { api } from './api';
 import { eventBus } from './lib/eventBus';
-import type { Task, Conversation } from './types';
+import type { Task, Conversation, ProjectInfo, RunningAgent } from './types';
 
 function App() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [activeView, setActiveView] = useState<'chat' | 'task' | 'monitor'>('chat');
+  const [projects, setProjects] = useState<ProjectInfo[]>([]);
+  const [agents, setAgents] = useState<RunningAgent[]>([]);
+
+  const [topLevel, setTopLevel] = useState<'dashboard' | 'project'>('dashboard');
+  const [selectedProject, setSelectedProject] = useState<string | null>(null);
+  const [activeView, setActiveView] = useState<'chat' | 'task'>('chat');
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -20,8 +25,10 @@ function App() {
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     return (localStorage.getItem('theme') as 'dark' | 'light') || 'dark';
   });
+
   const tasksSigRef = useRef('');
   const convSigRef = useRef('');
+  const agentsSigRef = useRef('');
 
   const fetchTasks = useCallback(async () => {
     try {
@@ -43,14 +50,36 @@ function App() {
     } catch { /* API may not be ready */ }
   }, []);
 
-  useEffect(() => {
+  const fetchProjects = useCallback(async () => {
+    try {
+      setProjects(await api.projects.list());
+    } catch { /* API may not be ready */ }
+  }, []);
+
+  const fetchAgents = useCallback(async () => {
+    try {
+      const data = await api.agents.running();
+      const sig = data.map(a => `${a.taskId}:${a.containerId}`).join(',');
+      if (sig === agentsSigRef.current) return;
+      agentsSigRef.current = sig;
+      setAgents(data);
+    } catch { /* API may not be ready */ }
+  }, []);
+
+  const fetchAll = useCallback(() => {
     fetchTasks();
     fetchConversations();
+    fetchProjects();
+    fetchAgents();
+  }, [fetchTasks, fetchConversations, fetchProjects, fetchAgents]);
+
+  useEffect(() => {
+    fetchAll();
 
     let intervalId: ReturnType<typeof setInterval> | null = null;
     const startPolling = () => {
       if (intervalId) clearInterval(intervalId);
-      intervalId = setInterval(() => { fetchTasks(); fetchConversations(); }, 30000);
+      intervalId = setInterval(fetchAll, 30000);
     };
     const stopPolling = () => {
       if (intervalId) { clearInterval(intervalId); intervalId = null; }
@@ -63,7 +92,7 @@ function App() {
         stopPolling();
       } else {
         if (debounce) clearTimeout(debounce);
-        debounce = setTimeout(() => { fetchTasks(); fetchConversations(); startPolling(); }, 500);
+        debounce = setTimeout(() => { fetchAll(); startPolling(); }, 500);
       }
     };
     document.addEventListener('visibilitychange', onVisibility);
@@ -73,15 +102,15 @@ function App() {
       document.removeEventListener('visibilitychange', onVisibility);
       if (debounce) clearTimeout(debounce);
     };
-  }, [fetchTasks, fetchConversations]);
+  }, [fetchAll]);
 
   useEffect(() => {
     const unsubs = [
-      eventBus.on('task:updated', () => fetchTasks()),
+      eventBus.on('task:updated', () => { fetchTasks(); fetchAgents(); }),
       eventBus.on('chat:message', () => fetchConversations()),
     ];
     return () => unsubs.forEach(fn => fn());
-  }, [fetchTasks, fetchConversations]);
+  }, [fetchTasks, fetchConversations, fetchAgents]);
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -94,11 +123,32 @@ function App() {
     return () => window.removeEventListener('keydown', handleKey);
   }, []);
 
+  useEffect(() => {
+    if (topLevel !== 'project') return;
+    const id = setInterval(fetchAgents, 10000);
+    return () => clearInterval(id);
+  }, [topLevel, fetchAgents]);
+
   const toggleTheme = () => {
     const next = theme === 'dark' ? 'light' : 'dark';
     setTheme(next);
     localStorage.setItem('theme', next);
     document.documentElement.classList.toggle('light', next === 'light');
+  };
+
+  const handleSelectProject = (name: string) => {
+    setSelectedProject(name);
+    setTopLevel('project');
+    setActiveView('chat');
+    setSelectedTaskId(null);
+    setSelectedConversationId(null);
+  };
+
+  const handleBackToDashboard = () => {
+    setTopLevel('dashboard');
+    setSelectedProject(null);
+    setSelectedTaskId(null);
+    setSelectedConversationId(null);
   };
 
   const handleSelectChat = (convId?: string) => {
@@ -118,30 +168,43 @@ function App() {
     setSelectedTaskId(null);
   };
 
-  const handleSelectMonitor = () => {
-    setActiveView('monitor');
-    setSelectedTaskId(null);
-    setSelectedConversationId(null);
-  };
-
   const handleConversationCreated = (convId: string) => {
     setSelectedConversationId(convId);
     fetchConversations();
   };
 
-  const selectedTask = tasks.find(t => t.meta.id === selectedTaskId) || null;
+  if (topLevel === 'dashboard') {
+    return (
+      <DashboardView
+        projects={projects}
+        tasks={tasks}
+        agents={agents}
+        conversations={conversations}
+        onSelectProject={handleSelectProject}
+        theme={theme}
+        onToggleTheme={toggleTheme}
+      />
+    );
+  }
+
+  const projectTasks = tasks.filter(t => t.meta.project === selectedProject);
+  const projectConversations = conversations.filter(c => c.project === selectedProject);
+  const projectAgents = agents.filter(a => a.project === selectedProject);
+  const selectedTask = projectTasks.find(t => t.meta.id === selectedTaskId) || null;
 
   return (
     <div className="h-screen flex bg-surface text-primary font-sans">
       <Sidebar
-        tasks={tasks}
-        conversations={conversations}
+        project={selectedProject!}
+        tasks={projectTasks}
+        conversations={projectConversations}
+        agents={projectAgents}
         activeView={activeView}
         selectedTaskId={selectedTaskId}
         selectedConversationId={selectedConversationId}
+        onBack={handleBackToDashboard}
         onSelectChat={handleSelectChat}
         onSelectTask={handleSelectTask}
-        onSelectMonitor={handleSelectMonitor}
         onNewChat={handleNewChat}
         collapsed={sidebarCollapsed}
         onToggleCollapse={() => setSidebarCollapsed(prev => !prev)}
@@ -156,17 +219,9 @@ function App() {
               key={selectedConversationId ?? '__new__'}
               initialConversationId={selectedConversationId}
               onConversationCreated={handleConversationCreated}
+              project={selectedProject || undefined}
             />
           </div>
-          {activeView === 'monitor' && (
-            <div className="flex-1 min-w-0">
-              <MonitorView
-                tasks={tasks}
-                onSelectTask={handleSelectTask}
-                onRefresh={fetchTasks}
-              />
-            </div>
-          )}
           {activeView === 'task' && selectedTask && (
             <div className="flex-1 min-w-0">
               <TaskDetailView task={selectedTask} onRefresh={fetchTasks} />
