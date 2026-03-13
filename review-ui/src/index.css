@@ -1,0 +1,117 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:wght@500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-surface: 13 13 11;
+  --color-card: 22 21 19;
+  --color-subtle: 34 33 30;
+  --color-primary: 232 230 224;
+  --color-secondary: 150 147 140;
+  --color-tertiary: 100 97 90;
+  --color-accent: 90 130 180;
+  --color-accent-dark: 75 115 165;
+  --color-accent-light: 115 155 205;
+  --color-working: 90 130 180;
+  --color-review: 155 100 255;
+  --color-done: 20 180 130;
+  --color-waiting: 240 180 40;
+  --color-success: 20 180 130;
+  --color-warning: 240 180 40;
+  --color-danger: 240 100 100;
+  --color-border: 46 44 40;
+  --color-ring: 90 130 180;
+  --color-scrollbar: 58 56 50;
+  --color-scrollbar-hover: 80 77 70;
+  --radius: 0.625rem;
+
+  --background: 13 13 11;
+  --foreground: 232 230 224;
+  --card: 22 21 19;
+  --card-foreground: 232 230 224;
+  --popover: 22 21 19;
+  --popover-foreground: 232 230 224;
+  --primary: 90 130 180;
+  --primary-foreground: 232 230 224;
+  --secondary: 34 33 30;
+  --secondary-foreground: 150 147 140;
+  --muted: 34 33 30;
+  --muted-foreground: 100 97 90;
+  --accent: 34 33 30;
+  --accent-foreground: 232 230 224;
+  --destructive: 240 100 100;
+  --destructive-foreground: 232 230 224;
+  --border: 46 44 40;
+  --input: 46 44 40;
+  --ring: 90 130 180;
+}
+
+.light {
+  --color-surface: 250 250 250;
+  --color-card: 255 255 255;
+  --color-subtle: 245 245 247;
+  --color-primary: 29 29 31;
+  --color-secondary: 110 110 115;
+  --color-tertiary: 161 161 166;
+  --color-accent: 30 58 95;
+  --color-accent-dark: 21 42 69;
+  --color-accent-light: 45 74 111;
+  --color-working: 30 58 95;
+  --color-review: 124 58 237;
+  --color-done: 5 150 105;
+  --color-waiting: 245 158 11;
+  --color-success: 5 150 105;
+  --color-warning: 245 158 11;
+  --color-danger: 220 38 38;
+  --color-border: 229 229 234;
+  --color-ring: 30 58 95;
+  --color-scrollbar: 209 209 214;
+  --color-scrollbar-hover: 161 161 166;
+
+  --background: 250 250 250;
+  --foreground: 29 29 31;
+  --card: 255 255 255;
+  --card-foreground: 29 29 31;
+  --popover: 255 255 255;
+  --popover-foreground: 29 29 31;
+  --primary: 30 58 95;
+  --primary-foreground: 255 255 255;
+  --secondary: 245 245 247;
+  --secondary-foreground: 29 29 31;
+  --muted: 245 245 247;
+  --muted-foreground: 110 110 115;
+  --accent: 245 245 247;
+  --accent-foreground: 29 29 31;
+  --destructive: 220 38 38;
+  --destructive-foreground: 255 255 255;
+  --border: 229 229 234;
+  --input: 229 229 234;
+  --ring: 30 58 95;
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: rgb(var(--color-surface));
+  color: rgb(var(--color-primary));
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Playfair Display', Georgia, serif;
+  color: rgb(var(--color-primary));
+}
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgb(var(--color-scrollbar)); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: rgb(var(--color-scrollbar-hover)); }
+
+@layer components {
+  .input-base {
+    @apply w-full px-4 py-2.5 bg-card border border-border rounded-xl text-primary placeholder:text-tertiary focus:ring-2 focus:ring-ring focus:border-transparent transition-shadow outline-none text-sm;
+  }
+}

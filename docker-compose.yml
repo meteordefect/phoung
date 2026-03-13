@@ -1,0 +1,54 @@
+services:
+  api:
+    build: ./main-agent
+    container_name: phoung-api
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ./memory:/app/memory
+      - ./repos:/app/repos
+      - /tmp/clawdeploy-workspaces:/tmp/clawdeploy-workspaces
+      - /var/run/docker.sock:/var/run/docker.sock
+    env_file: .env
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:8000/health').then(r => { if (!r.ok) process.exit(1) })"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      - devopstasks
+
+  review-ui:
+    build:
+      context: ./review-ui
+      args:
+        VITE_API_URL: /api
+    container_name: phoung-ui
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - devopstasks
+
+  nginx:
+    image: nginx:alpine
+    container_name: phoung-nginx
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - api
+      - review-ui
+    networks:
+      - devopstasks
+
+networks:
+  devopstasks:
+    driver: bridge

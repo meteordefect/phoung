@@ -1,4 +1,4 @@
-# Phoung v3
+# Phoung Project Manager
 
 Phoung is your project manager for coding work.  
 You chat with Phoung in the review UI.  
@@ -142,30 +142,21 @@ Key endpoints:
 
 ### Prerequisites
 
-- Docker host (Linux recommended for gVisor support)
-- Ansible 2.15 or newer
-- SSH access
-- API credentials for your selected model providers and GitHub
+- A Linux VPS (Ubuntu 22.04+ recommended for gVisor support)
+- Ansible 2.15 or newer on your local machine
+- SSH access to the server (key-based)
+- At least one LLM API key (Kimi, ZAI/GLM, or Anthropic)
+- GitHub personal access token
 
 ### Configuration
 
-Create `.env` at repo root with values such as:
+Copy `.env.example` to `.env` at the repo root and fill in your values:
 
-```env
-KIMI_API_KEY=
-ZAI_API_KEY=
-ANTHROPIC_API_KEY=
-GITHUB_TOKEN=
-DEFAULT_MODEL=
-SUBAGENT_MODEL=
-MAX_CONCURRENT_SUBAGENTS=3
-SUBAGENT_IMAGE=phoung/subagent:latest
-SUBAGENT_MEMORY_LIMIT=4g
-SUBAGENT_CPUS=2
-SUBAGENT_RUNTIME=runsc
-REPOS_DIR=/app/repos
-WORKSPACES_DIR=/tmp/clawdeploy-workspaces
+```bash
+cp .env.example .env
 ```
+
+See `.env.example` for all available settings. At minimum you need one LLM API key and a `GITHUB_TOKEN`.
 
 ### gVisor Setup
 
@@ -197,18 +188,31 @@ Set `SUBAGENT_RUNTIME=runsc` in `.env`. To run without gVisor (e.g. local dev), 
 ### Deploy
 
 ```bash
-source .env
+# 1. Create .env at the repo root with your API keys
+cp .env.example .env
+# Edit .env — set at least one LLM key and your GITHUB_TOKEN
+
+# 2. Set up Ansible inventory with your server IP
 cd deploy
+cp ansible/inventory.ini.example ansible/inventory.ini
+# Edit ansible/inventory.ini — replace YOUR_SERVER_IP
+
+# 3. Deploy the v2 stack
 ./deploy.sh deploy-v2
 ```
+
+This syncs the repo to your server, builds all containers, installs gVisor, and starts the stack.
 
 ### Access UI
 
 ```bash
+cd deploy
 ./deploy.sh tunnel
 ```
 
 Open `http://localhost:8080`.
+
+To override the SSH key path: `SSH_KEY=~/.ssh/my-key ./deploy.sh tunnel`
 
 ## Secret Safety Before Push
 
