@@ -7,8 +7,8 @@ project_dir: /opt/phoung
 compose_file: "{{ project_dir }}/docker-compose.yml"
 env_file: "{{ project_dir }}/.env"
 
-# Domain settings (loaded from .env or use default)
-domain: "{{ lookup('env', 'DOMAIN') | default('beta.friendlabs.ai', true) }}"
+# Domain settings (set DOMAIN env var to enable public agent API on 80/443)
+domain: "{{ lookup('env', 'DOMAIN') | default('', true) }}"
 
 # Docker settings
 docker_version: "24.0"
@@ -22,6 +22,6 @@ nginx_user: www-data
 nginx_worker_processes: auto
 nginx_worker_connections: 1024
 
-# SSL (optional, for future)
-ssl_enabled: true
+# SSL (auto-enabled when domain is set)
+ssl_enabled: "{{ domain | length > 0 }}"
 ssl_cert_path: /etc/letsencrypt/live/{{ domain }}

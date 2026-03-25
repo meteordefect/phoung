@@ -22,18 +22,41 @@
           - htop
           - vim
           - apache2-utils
+        state: present
+
+    - name: Install Certbot (when domain is configured)
+      apt:
+        name:
           - certbot
           - python3-certbot-nginx
         state: present
+      when: domain | length > 0
 
-    - name: Add Docker GPG key
-      apt_key:
-        url: https://download.docker.com/linux/ubuntu/gpg
-        state: present
+    - name: Create keyrings directory
+      file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: '0755'
 
-    - name: Add Docker repository
+    - name: Add Docker GPG key (signed-by)
+      shell: curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+      args:
+        creates: /etc/apt/keyrings/docker.asc
+
+    - name: Remove all legacy Docker apt sources
+      shell: rm -f /etc/apt/sources.list.d/docker.list /etc/apt/sources.list.d/download_docker_com_linux_ubuntu.list /etc/apt/sources.list.d/archive_uri-https_download_docker_com_linux_ubuntu-*.list
+      changed_when: false
+
+    - name: Remove Docker entries from main sources.list
+      lineinfile:
+        path: /etc/apt/sources.list
+        regexp: 'download.docker.com'
+        state: absent
+
+    - name: Add Docker repository (signed-by)
       apt_repository:
-        repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+        repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu {{ ansible_facts['distribution_release'] }} stable"
+        filename: docker
         state: present
 
     - name: Install Docker
@@ -51,6 +74,74 @@
         name: docker
         state: started
         enabled: yes
+
+    - name: Install Tailscale
+      shell: curl -fsSL https://tailscale.com/install.sh | sh
+      args:
+        creates: /usr/bin/tailscale
+
+    - name: Enable and start Tailscaled
+      systemd:
+        name: tailscaled
+        state: started
+        enabled: yes
+
+    - name: Check Tailscale status
+      shell: tailscale status --json | grep -q '"BackendState":"Running"'
+      register: ts_status
+      failed_when: false
+      changed_when: false
+
+    - name: Tailscale auth reminder
+      debug:
+        msg: >
+          Tailscale is installed but not authenticated.
+          SSH into the server and run: sudo tailscale up
+          Then authorize the device at the URL shown.
+      when: ts_status.rc != 0
+
+    - name: Install UFW
+      apt:
+        name: ufw
+        state: present
+
+    - name: Allow SSH through firewall
+      ufw:
+        rule: allow
+        port: '22'
+        proto: tcp
+
+    - name: Allow Tailscale UDP through firewall
+      ufw:
+        rule: allow
+        port: '41641'
+        proto: udp
+
+    - name: Allow dashboard via Tailscale (port 8080)
+      ufw:
+        rule: allow
+        from_ip: 100.64.0.0/10
+        port: '8080'
+        proto: tcp
+
+    - name: Allow HTTP (for domain + certbot)
+      ufw:
+        rule: allow
+        port: '80'
+        proto: tcp
+      when: domain | length > 0
+
+    - name: Allow HTTPS (for domain)
+      ufw:
+        rule: allow
+        port: '443'
+        proto: tcp
+      when: domain | length > 0
+
+    - name: Enable UFW firewall (deny all by default)
+      ufw:
+        state: enabled
+        policy: deny
 
     - name: Create project directory
       file:
@@ -100,6 +191,11 @@
           - "--exclude=node_modules"
           - "--exclude=dist"
 
+    - name: Check if Agent Bridge source exists
+      local_action: stat path="{{ playbook_dir }}/../../agent-bridge"
+      register: agent_bridge_dir
+      become: no
+
     - name: Copy Agent Bridge source
       synchronize:
         src: ../../agent-bridge/
@@ -108,6 +204,12 @@
         rsync_opts:
           - "--exclude=node_modules"
           - "--exclude=dist"
+      when: agent_bridge_dir.stat.exists
+
+    - name: Check if OpenClaw source exists
+      local_action: stat path="{{ playbook_dir }}/../../../openclaw-source"
+      register: openclaw_source_dir
+      become: no
 
     - name: Copy OpenClaw source (for building gateway image)
       synchronize:
@@ -118,6 +220,7 @@
           - "--exclude=node_modules"
           - "--exclude=dist"
           - "--exclude=.git"
+      when: openclaw_source_dir.stat.exists
 
     - name: Install Nginx
       apt:
@@ -149,6 +252,28 @@
         path: /var/www/certbot
         state: directory
         mode: '0755'
+      when: domain | length > 0
+
+    - name: Check if SSL cert exists
+      stat:
+        path: "{{ ssl_cert_path }}/fullchain.pem"
+      register: ssl_cert_stat
+      when: domain | length > 0
+
+    - name: Generate self-signed cert (placeholder until certbot runs)
+      shell: >
+        mkdir -p {{ ssl_cert_path }} &&
+        openssl req -x509 -nodes -days 365 -newkey rsa:2048
+        -keyout {{ ssl_cert_path }}/privkey.pem
+        -out {{ ssl_cert_path }}/fullchain.pem
+        -subj '/CN={{ domain }}'
+      when: domain | length > 0 and (not ssl_cert_stat.stat.exists | default(false))
+
+    - name: Restart Nginx after cert setup
+      systemd:
+        name: nginx
+        state: restarted
+      when: domain | length > 0
 
     - name: Stop any running containers
       shell: cd {{ project_dir }} && docker compose down || true
@@ -159,8 +284,8 @@
       environment:
         DOCKER_BUILDKIT: "1"
 
-    - name: Start Docker Compose services (including agent-bridge and gateway)
-      shell: cd {{ project_dir }} && docker compose --profile agent-bridge --profile openclaw-gateway up -d
+    - name: Start Docker Compose services
+      shell: cd {{ project_dir }} && docker compose up -d
       environment:
         COMPOSE_HTTP_TIMEOUT: "200"
 
@@ -176,18 +301,26 @@
         cd {{ project_dir }} &&
         docker exec openclaw-gateway node openclaw.mjs models set zai/glm-4.7
       ignore_errors: yes
+      when: openclaw_source_dir.stat.exists | default(false)
 
     - name: Obtain SSL certificate from Let's Encrypt
       shell: >
         certbot certonly --webroot
         --webroot-path /var/www/certbot
-        --email "{{ lookup('env', 'SSL_EMAIL') | default('admin@' + lookup('env', 'DOMAIN'), true) }}"
+        --email "{{ lookup('env', 'SSL_EMAIL') | default('admin@' + domain, true) }}"
         --agree-tos
         --non-interactive
-        -d "{{ lookup('env', 'DOMAIN') }}"
+        -d "{{ domain }}"
       register: certbot_result
       failed_when: false
       changed_when: certbot_result.rc == 0
+      when: domain | length > 0
+
+    - name: Reload Nginx after real cert
+      systemd:
+        name: nginx
+        state: reloaded
+      when: domain | length > 0 and certbot_result.rc | default(1) == 0
 
     - name: Set up SSL certificate renewal
       cron:
@@ -197,6 +330,7 @@
         minute: "0"
         user: root
         state: present
+      when: domain | length > 0
 
   handlers:
     - name: Reload Nginx

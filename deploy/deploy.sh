@@ -167,7 +167,8 @@ cmd_init() {
     cmd_ansible_migrate
 
     log_success "Phoung v4 Control Plane is ready!"
-    log_info "Open dashboard via SSH tunnel: ./deploy.sh tunnel"
+    log_info "Set up Tailscale: ./deploy.sh tailscale-up"
+    log_info "Or use SSH tunnel: ./deploy.sh tunnel"
 }
 
 cmd_full() {
@@ -235,7 +236,8 @@ cmd_deploy_v2() {
     ansible-playbook playbooks/deploy-v2.yml
     cd ..
     log_success "Phoung v2 deployed!"
-    log_info "Open dashboard via SSH tunnel: ./deploy.sh tunnel"
+    log_info "Set up Tailscale: ./deploy.sh tailscale-up"
+    log_info "Or use SSH tunnel: ./deploy.sh tunnel"
 }
 
 cmd_tunnel() {
@@ -247,9 +249,34 @@ cmd_tunnel() {
     SERVER_IP=$(grep ansible_host ansible/inventory.ini | cut -d'=' -f2)
     log_info "Opening SSH tunnel → $SERVER_IP"
     log_success "Dashboard: http://localhost:8080"
+    log_info "Tip: With Tailscale you can access directly — no tunnel needed."
     log_info "Press Ctrl+C to close tunnel"
     echo ""
     ssh -i "$SSH_KEY" -N -L 8080:127.0.0.1:8080 root@$SERVER_IP
+}
+
+cmd_tailscale_status() {
+    if [ ! -f ansible/inventory.ini ]; then
+        log_error "Ansible inventory not found. Run 'deploy.sh init' first."
+        exit 1
+    fi
+
+    SERVER_IP=$(grep ansible_host ansible/inventory.ini | cut -d'=' -f2)
+    log_info "Checking Tailscale status on $SERVER_IP..."
+    ssh -i "$SSH_KEY" root@$SERVER_IP "tailscale status" 2>/dev/null || log_error "Tailscale not installed or not running. Run: ./deploy.sh deploy"
+}
+
+cmd_tailscale_up() {
+    if [ ! -f ansible/inventory.ini ]; then
+        log_error "Ansible inventory not found. Run 'deploy.sh init' first."
+        exit 1
+    fi
+
+    SERVER_IP=$(grep ansible_host ansible/inventory.ini | cut -d'=' -f2)
+    log_info "Authenticating Tailscale on $SERVER_IP..."
+    log_info "Follow the auth URL printed below to authorize the device."
+    echo ""
+    ssh -i "$SSH_KEY" -t root@$SERVER_IP "tailscale up"
 }
 
 cmd_ssh() {
@@ -510,6 +537,8 @@ ${BLUE}OpenClaw Gateway (Chat Feature):${NC}
   
 ${BLUE}Access Commands:${NC}
   tunnel            Open SSH tunnel → http://localhost:8080 (SSH key required)
+  tailscale-status  Check Tailscale status on server
+  tailscale-up      Authenticate Tailscale on server (interactive)
   ssh               SSH to server
   logs              View server logs
 
@@ -537,8 +566,12 @@ ${BLUE}Fresh Server Setup — v2 (run in order):${NC}
   ${GREEN}# 3. Deploy v2 stack${NC}
   ./deploy.sh deploy-v2
 
-  ${GREEN}# 4. Open dashboard in browser${NC}
-  ./deploy.sh tunnel   # then visit http://localhost:8080
+  ${GREEN}# 4. Set up Tailscale for remote access${NC}
+  ./deploy.sh tailscale-up   # follow the auth URL
+
+  ${GREEN}# 5. Open dashboard in browser${NC}
+  http://<tailscale-ip>:8080   # from any Tailscale device
+  ./deploy.sh tunnel           # or via SSH tunnel at http://localhost:8080
 
 ${BLUE}Day-to-Day:${NC}
   ${GREEN}# Push code changes to server${NC}
@@ -578,6 +611,8 @@ case "${1:-help}" in
     status)                      cmd_ansible_status ;;
     backup)                      cmd_ansible_backup ;;
     tunnel)                      cmd_tunnel ;;
+    tailscale-status)            cmd_tailscale_status ;;
+    tailscale-up)                cmd_tailscale_up ;;
     ssh)                         cmd_ssh ;;
     logs)                        cmd_logs ;;
     build-openclaw)              cmd_build_openclaw ;;

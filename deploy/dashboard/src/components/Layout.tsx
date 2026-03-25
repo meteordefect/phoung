@@ -3,8 +3,9 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   GitPullRequest, MessageSquare, ListTodo, Activity,
   FolderOpen, Settings as SettingsIcon, Menu, X,
-  Sun, Moon, Plus, ChevronDown,
+  Sun, Moon, Plus, ChevronDown, Terminal,
 } from 'lucide-react';
+import { UserButton } from '@clerk/react';
 import { api, connectSSE, disconnectSSE } from '../api/client';
 import { usePolling } from '../hooks/usePolling';
 import type { Project } from '../types';
@@ -28,6 +29,7 @@ interface NavItem {
 function projectNav(projectId: string, counts?: { tasks_pending: number; merge_ready: number }): NavItem[] {
   return [
     { path: `/p/${projectId}/tasks`,       label: 'Tasks',       icon: ListTodo,       badge: counts?.tasks_pending },
+    { path: `/p/${projectId}/agents`,      label: 'Agents',      icon: Terminal },
     { path: `/p/${projectId}/merge-queue`, label: 'Merge Queue', icon: GitPullRequest, badge: counts?.merge_ready },
     { path: `/p/${projectId}/chat`,        label: 'Chat',        icon: MessageSquare },
     { path: `/p/${projectId}/activity`,    label: 'Activity',    icon: Activity },
@@ -150,7 +152,10 @@ export function Layout({ children }: LayoutProps) {
           <span className="hidden sm:inline">Add</span>
         </Button>
 
-        {/* Theme + mobile menu */}
+        {/* User + Theme + mobile menu */}
+        {import.meta.env.VITE_CLERK_PUBLISHABLE_KEY && (
+          <UserButton appearance={{ elements: { avatarBox: 'w-7 h-7' } }} />
+        )}
         <button
           onClick={toggleTheme}
           className="p-2 rounded-lg text-tertiary hover:text-primary hover:bg-subtle transition-colors"

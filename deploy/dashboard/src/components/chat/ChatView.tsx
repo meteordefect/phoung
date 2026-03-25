@@ -12,9 +12,7 @@ const getGatewayWsUrl = () => {
   if (envUrl) return envUrl;
 
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const host = window.location.host;
-  const port = window.location.port ? `:${window.location.port}` : '';
-  return `${protocol}//${host}${port}`;
+  return `${protocol}//${window.location.host}/gateway/ws`;
 };
 
 const GATEWAY_WS_URL = getGatewayWsUrl();

@@ -144,6 +144,8 @@ export const api = {
       request<Event[]>(`/projects/${projectId}/activity${limit ? `?limit=${limit}` : ''}`),
     counts: (projectId: string) =>
       request<{ tasks_pending: number; merge_ready: number }>(`/projects/${projectId}/counts`),
+    taskActivity: (taskId: string, limit = 50) =>
+      request<Event[]>(`/tasks/${taskId}/activity?limit=${limit}`),
   },
 };
 

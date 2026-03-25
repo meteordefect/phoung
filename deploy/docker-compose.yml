@@ -53,6 +53,7 @@ services:
         VITE_API_URL: ${VITE_API_URL}
         VITE_GATEWAY_WS_URL: ${VITE_GATEWAY_WS_URL}
         VITE_GATEWAY_TOKEN: ${VITE_GATEWAY_TOKEN}
+        VITE_CLERK_PUBLISHABLE_KEY: ${VITE_CLERK_PUBLISHABLE_KEY:-}
     container_name: phoung-dashboard
     restart: unless-stopped
     ports:

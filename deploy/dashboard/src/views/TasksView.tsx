@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import {
   GitBranch, ExternalLink, MoreHorizontal, RefreshCw,

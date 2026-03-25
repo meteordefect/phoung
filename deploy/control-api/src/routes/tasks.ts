@@ -322,6 +322,26 @@ router.post('/tasks/:id/request-changes', async (req: Request, res: Response) =>
   }
 });
 
+router.get('/tasks/:id/activity', async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { limit = '100' } = req.query;
+
+  try {
+    const events = await query(
+      `SELECT * FROM events
+       WHERE task_id = $1
+       ORDER BY created_at DESC
+       LIMIT $2`,
+      [id, parseInt(limit as string, 10)]
+    );
+
+    res.json(events);
+  } catch (err) {
+    console.error('Error fetching task activity:', err);
+    res.status(500).json({ error: 'Failed to fetch task activity' });
+  }
+});
+
 router.get('/projects/:projectId/activity', async (req: Request, res: Response) => {
   const { projectId } = req.params;
   const { limit = '100' } = req.query;
