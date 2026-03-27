@@ -1,0 +1,9 @@
+{
+  "shortcuts": [
+    {
+      "label": "Run",
+      "command": "npm run dogfood --skip-shutdown-cleanup",
+      "icon": "play"
+    }
+  ]
+}

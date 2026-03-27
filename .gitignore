@@ -3,10 +3,6 @@
 .env.*
 !.env.example
 .envrc
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
 
 # Common secrets and certs
 *.pem
@@ -72,8 +68,19 @@ tmp/
 temp/
 .cache/
 
-# Memory logs (auto-generated)
-memory/logs/
+# Archive node_modules and dist (don't track bulk in archive)
+archive/**/node_modules/
+archive/**/dist/
+archive/**/.env
 
-# Local repo clones (managed by Phoung)
-repos/
+# Kanban runtime data (created at runtime, not committed)
+kanban/web-ui/node_modules/
+kanban/web-ui/dist/
+kanban/node_modules/
+kanban/dist/
+
+# Research clones with embedded secrets/git repos
+docs/research/pi-mono/
+
+# Memory (lives in external repo, never in app repo)
+memory/
