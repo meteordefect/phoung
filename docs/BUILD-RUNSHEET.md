@@ -2,7 +2,7 @@
 
 Step-by-step execution plan for the Phoung/Kanban rebuild. Each phase produces a working checkpoint. Do not skip phases — each depends on the previous.
 
-## Phase 1: Import Kanban and boot locally
+## Phase 1: Import Kanban and boot locally ✅
 
 ### 1.1 Clone upstream Kanban
 
@@ -43,9 +43,11 @@ Open the local URL in a browser. Verify:
 
 Kanban runs locally as an unmodified fork. Commit this as the baseline.
 
+> **Done** — committed `ff73a90`, Kanban v0.1.47 imported, builds and boots at `localhost:3484`.
+
 ---
 
-## Phase 2: Add `pi` as a Kanban agent
+## Phase 2: Add `pi` as a Kanban agent ✅
 
 ### 2.1 Extend the agent ID enum
 
@@ -90,6 +92,8 @@ Create `piAdapter: AgentSessionAdapter` following the codex adapter pattern:
 ### 2.5 Checkpoint
 
 pi runs tasks through Kanban locally. Commit.
+
+> **Done** — committed `ff73a90`. Pi appears in onboarding + settings, detected on PATH, launches with `-p --no-session`. API key for ZAI provider needed on VPS.
 
 ---
 
