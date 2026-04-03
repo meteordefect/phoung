@@ -208,6 +208,69 @@ cmd_nginx() {
     log_success "Nginx updated"
 }
 
+cmd_kanban() {
+    if [ -f ../.env ]; then
+        export $(grep -v '^#' ../.env | grep -v '^$' | xargs)
+    fi
+    if [ -f .env ]; then
+        export $(grep -v '^#' .env | grep -v '^$' | xargs)
+    fi
+
+    if [ -z "$CLERK_SECRET_KEY" ]; then
+        log_warn "CLERK_SECRET_KEY not set — auth will be disabled on the server."
+    fi
+
+    if [ ! -f ansible/inventory.ini ]; then
+        log_error "Ansible inventory not found at ansible/inventory.ini"
+        exit 1
+    fi
+
+    log_info "Deploying Kanban fork to VPS..."
+    cd ansible
+    ansible-playbook playbooks/kanban-deploy.yml
+    cd ..
+
+    if [ -n "$DOMAIN" ]; then
+        log_success "Kanban deployed! Open https://$DOMAIN"
+    else
+        log_success "Kanban deployed! Access via SSH tunnel or direct IP."
+    fi
+}
+
+cmd_kanban_logs() {
+    if [ ! -f ansible/inventory.ini ]; then
+        log_error "Ansible inventory not found."
+        exit 1
+    fi
+
+    SERVER_IP=$(grep ansible_host ansible/inventory.ini | cut -d'=' -f2)
+    log_info "Fetching Kanban logs from $SERVER_IP..."
+    ssh -i "$SSH_KEY" root@$SERVER_IP "journalctl -u kanban -f --no-pager -n 100"
+}
+
+cmd_kanban_restart() {
+    if [ ! -f ansible/inventory.ini ]; then
+        log_error "Ansible inventory not found."
+        exit 1
+    fi
+
+    SERVER_IP=$(grep ansible_host ansible/inventory.ini | cut -d'=' -f2)
+    log_info "Restarting Kanban on $SERVER_IP..."
+    ssh -i "$SSH_KEY" root@$SERVER_IP "systemctl restart kanban"
+    log_success "Kanban restarted"
+}
+
+cmd_kanban_status() {
+    if [ ! -f ansible/inventory.ini ]; then
+        log_error "Ansible inventory not found."
+        exit 1
+    fi
+
+    SERVER_IP=$(grep ansible_host ansible/inventory.ini | cut -d'=' -f2)
+    log_info "Kanban status on $SERVER_IP..."
+    ssh -i "$SSH_KEY" root@$SERVER_IP "systemctl status kanban --no-pager"
+}
+
 cmd_deploy_v2() {
     if [ -f ../.env ]; then
         export $(grep -v '^#' ../.env | grep -v '^$' | xargs)
@@ -486,12 +549,18 @@ cmd_check_ssl() {
 
 cmd_help() {
     cat <<EOF
-${GREEN}Phoung v4 - Deployment Tool${NC}
+${GREEN}Phoung v5 - Deployment Tool${NC}
 
 ${BLUE}Usage:${NC}
   ./deploy.sh [command]
 
-${BLUE}Setup Commands:${NC}
+${BLUE}Kanban Fork (v5 — primary):${NC}
+  kanban            Deploy Kanban fork to VPS (build + systemd + nginx + TLS)
+  kanban-logs       View Kanban runtime logs (journalctl)
+  kanban-restart    Restart Kanban service on VPS
+  kanban-status     Check Kanban service status
+
+${BLUE}Legacy Setup Commands:${NC}
   init              Fresh VPS → fully running control plane + agent bridge
   full              Terraform plan + full Ansible redeploy
   
@@ -595,6 +664,10 @@ EOF
 
 # Main command router
 case "${1:-help}" in
+    kanban)                      cmd_kanban ;;
+    kanban-logs)                 cmd_kanban_logs ;;
+    kanban-restart)              cmd_kanban_restart ;;
+    kanban-status)               cmd_kanban_status ;;
     init)                        cmd_init ;;
     full)                        cmd_full ;;
     terraform-init)              cmd_terraform_init ;;
