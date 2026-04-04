@@ -299,6 +299,21 @@ export function useGitActions({
 				}
 				const typed = await sendTaskSessionInput(taskId, prompt, { appendNewline: false, mode: "paste" });
 				if (!typed.ok) {
+					if (currentProjectId) {
+						try {
+							const trpcClient = getRuntimeTrpcClient(currentProjectId);
+							const payload = await trpcClient.runtime.startTaskSession.mutate({
+								taskId,
+								prompt,
+								baseRef: selection.card.baseRef,
+							});
+							if (payload.ok && payload.summary) {
+								return true;
+							}
+						} catch {
+							// Fall through to error toast.
+						}
+					}
 					showAppToast({
 						intent: "danger",
 						icon: "warning-sign",
@@ -327,6 +342,7 @@ export function useGitActions({
 		},
 		[
 			board,
+			currentProjectId,
 			fetchTaskWorkspaceInfo,
 			runtimeProjectConfig,
 			sendTaskChatMessage,
