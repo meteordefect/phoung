@@ -9,6 +9,8 @@
     kanban_env_file: /opt/kanban/.env
     kanban_port: 3484
     node_major_version: 22
+    memory_repo: git@github.com:meteordefect/base-control.git
+    memory_dir: /data/phoung-memory
 
   tasks:
     # --- Node.js ---
@@ -242,6 +244,56 @@
       ufw:
         state: enabled
         policy: deny
+
+    # --- External memory repo ---
+
+    - name: Create memory data directory
+      file:
+        path: /data
+        state: directory
+        mode: '0755'
+
+    - name: Check if memory repo exists
+      stat:
+        path: "{{ memory_dir }}/.git"
+      register: memory_repo_stat
+
+    - name: Initialize memory repo for empty remote
+      shell: |
+        git init "{{ memory_dir }}"
+        cd "{{ memory_dir }}"
+        git remote add origin "{{ memory_repo }}"
+        git fetch origin main && git checkout main || true
+      when: not memory_repo_stat.stat.exists
+
+    - name: Configure git user for memory repo
+      shell: |
+        cd {{ memory_dir }}
+        git config user.email "kanban@friendlabs.ai"
+        git config user.name "Kanban Runtime"
+
+    - name: Ensure repos directory exists
+      file:
+        path: /opt/repos
+        state: directory
+        mode: '0755'
+
+    - name: Ensure MEMORY_DIR in env file
+      lineinfile:
+        path: "{{ kanban_env_file }}"
+        regexp: '^MEMORY_DIR='
+        line: "MEMORY_DIR={{ memory_dir }}"
+        state: present
+      notify: Restart Kanban
+
+    - name: Set up hourly memory backup cron
+      cron:
+        name: "Backup memory repo"
+        job: "cd {{ memory_dir }} && git add -A && git diff --cached --quiet || git commit -m \"auto: $(date -u +\\%Y-\\%m-\\%dT\\%H:\\%M)\" && git push"
+        hour: "*"
+        minute: "0"
+        user: root
+        state: present
 
   handlers:
     - name: Restart Kanban

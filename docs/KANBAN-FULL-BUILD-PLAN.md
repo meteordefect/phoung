@@ -537,7 +537,7 @@ Current code likely worth mining:
 
 These should be treated as source material, not sacred architecture.
 
-## Track D: Add memory service
+## Track D: Add memory service ✅
 
 Goal:
 
@@ -555,6 +555,8 @@ Current source material:
 
 - `docs/MEMORY-SEPARATION.md`
 - `main-agent/src/memory.ts`
+
+> Done — `kanban/src/memory/` created with `memory-service.ts`, `memory-loader.ts`, `memory-sync.ts`. tRPC memory sub-router added. Ansible deploys clone `meteordefect/base-control` to `/data/phoung-memory` with hourly cron backup. VPS deploy activates it.
 
 ## Track E: Add `pi` worker runtime ✅ (initial integration)
 
@@ -673,7 +675,7 @@ Outcome:
 - `./deploy.sh kanban` for one-command deploy via Ansible
 - systemd service, UFW firewall, Let's Encrypt TLS all configured
 
-## Phase 5: Add external memory service
+## Phase 5: Add external memory service ✅
 
 Outcome:
 
@@ -750,8 +752,8 @@ Build in this order (revised to match actual execution):
 2. ✅ add `pi` as Kanban agent (moved up — needed early to validate the fork)
 3. ✅ add Clerk auth (Tailscale step dropped — going straight to public Clerk-gated access)
 4. ✅ deploy to VPS with public HTTPS + Clerk (systemd, nginx, TLS, pi, UFW)
-5. externalize memory service and backup jobs ← **next**
-6. add `Phoung` manager service and chat surface
+5. ✅ externalize memory service and backup jobs
+6. add `Phoung` manager service and chat surface ← **next**
 7. connect memory to task lifecycle
 8. production hardening (systemd, Ansible, backups, monitoring)
 
@@ -776,4 +778,4 @@ The migration is complete when all of the following are true:
 
 The technical implementation plan is `docs/BUILD-RUNSHEET.md`. It contains step-by-step execution instructions for each phase.
 
-Current status: Phases 1–4 complete. The system is live at `beta.friendlabs.ai` with Clerk auth, pi task execution (ZAI/GLM), and full deploy automation. Next action is Phase 5 — adding the external memory service.
+Current status: Phases 1–5 complete. The system is live at `beta.friendlabs.ai` with Clerk auth, pi task execution (ZAI/GLM), full deploy automation, and external memory service. Next action is Phase 6 — adding the Phoung manager service and chat surface.

@@ -41,6 +41,7 @@ import { useDebugTools } from "@/hooks/use-debug-tools";
 import { useDocumentVisibility } from "@/hooks/use-document-visibility";
 import { useGitActions } from "@/hooks/use-git-actions";
 import { useHomeSidebarAgentPanel } from "@/hooks/use-home-sidebar-agent-panel";
+import { PhoungChatPanel } from "@/components/phoung/phoung-chat-panel";
 import { useKanbanAccessGate } from "@/hooks/use-kanban-access-gate";
 import { useOpenWorkspace } from "@/hooks/use-open-workspace";
 import { usePrewarmedAgentTerminals } from "@/hooks/use-prewarmed-agent-terminals";
@@ -758,7 +759,7 @@ export default function App(): ReactElement {
 					activeSection={homeSidebarSection}
 					onActiveSectionChange={setHomeSidebarSection}
 					canShowAgentSection={!hasNoProjects && Boolean(currentProjectId)}
-					agentSectionContent={homeSidebarAgentPanel}
+					agentSectionContent={<PhoungChatPanel workspaceId={currentProjectId} />}
 					onSelectProject={(projectId) => {
 						void handleSelectProject(projectId);
 					}}

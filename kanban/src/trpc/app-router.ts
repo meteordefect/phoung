@@ -4,6 +4,8 @@
 import type { inferRouterInputs, inferRouterOutputs } from "@trpc/server";
 import { initTRPC, TRPCError } from "@trpc/server";
 import { z } from "zod";
+import type { MemoryApi } from "./memory-api.js";
+import type { PhoungApi } from "./phoung-api.js";
 
 import type {
 	RuntimeCommandRunRequest,
@@ -316,6 +318,8 @@ export interface RuntimeTrpcContext {
 	hooksApi: {
 		ingest: (input: RuntimeHookIngestRequest) => Promise<RuntimeHookIngestResponse>;
 	};
+	memoryApi: MemoryApi;
+	phoungApi: PhoungApi;
 }
 
 interface RuntimeTrpcContextWithWorkspaceScope extends RuntimeTrpcContext {
@@ -630,6 +634,50 @@ export const runtimeAppRouter = t.router({
 			.output(runtimeHookIngestResponseSchema)
 			.mutation(async ({ ctx, input }) => {
 				return await ctx.hooksApi.ingest(input);
+			}),
+	}),
+	memory: t.router({
+		loadOverview: t.procedure.query(async ({ ctx }) => {
+			return await ctx.memoryApi.loadOverview();
+		}),
+		loadProjectContext: t.procedure
+			.input(z.object({ project: z.string() }))
+			.query(async ({ ctx, input }) => {
+				return await ctx.memoryApi.loadProjectContext(input);
+			}),
+		listProjects: t.procedure.query(async ({ ctx }) => {
+			return await ctx.memoryApi.listProjects();
+		}),
+		listMemories: t.procedure
+			.input(z.object({ project: z.string() }))
+			.query(async ({ ctx, input }) => {
+				return await ctx.memoryApi.listMemories(input);
+			}),
+		loadMemory: t.procedure
+			.input(z.object({ project: z.string(), filename: z.string() }))
+			.query(async ({ ctx, input }) => {
+				return await ctx.memoryApi.loadMemory(input);
+			}),
+		getStatus: t.procedure.query(async ({ ctx }) => {
+			return await ctx.memoryApi.getStatus();
+		}),
+		sync: t.procedure.mutation(async ({ ctx }) => {
+			return await ctx.memoryApi.sync();
+		}),
+	}),
+	phoung: t.router({
+		getModels: t.procedure.query(async ({ ctx }) => {
+			return await ctx.phoungApi.getModels();
+		}),
+		getSessionStats: t.procedure
+			.input(z.object({ conversationId: z.string() }))
+			.query(async ({ ctx, input }) => {
+				return await ctx.phoungApi.getSessionStats(input);
+			}),
+		getActiveTurn: t.procedure
+			.input(z.object({ conversationId: z.string() }))
+			.query(async ({ ctx, input }) => {
+				return await ctx.phoungApi.getActiveTurn(input);
 			}),
 	}),
 });

@@ -226,7 +226,7 @@ Kanban + pi + Clerk auth running on VPS, publicly accessible at `beta.friendlabs
 
 ---
 
-## Phase 5: Add external memory service
+## Phase 5: Add external memory service ✅
 
 ### 5.1 Create memory service module
 
@@ -277,6 +277,8 @@ Add a `memory` sub-router:
 ### 5.6 Checkpoint
 
 External memory repo is live, readable by the app, auto-backed-up. Commit.
+
+> **Done** — Memory service implemented. `kanban/src/memory/` created with three modules: `memory-service.ts` (core read ops, frontmatter parsing via js-yaml), `memory-loader.ts` (selective context assembly), `memory-sync.ts` (git commit/push). tRPC `memory` sub-router added to `app-router.ts` with 7 procedures (loadOverview, loadProjectContext, listProjects, listMemories, loadMemory, getStatus, sync). `memory-api.ts` factory wired into `runtime-server.ts`. Ansible playbook updated to clone `meteordefect/base-control` to `/data/phoung-memory`, set `MEMORY_DIR` in env, and install hourly cron for auto-backup. VPS deploy pending.
 
 ---
 

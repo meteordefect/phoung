@@ -70,6 +70,13 @@ export function createRuntimeStateHub(deps: CreateRuntimeStateHubDependencies): 
 	const runtimeStateWorkspaceIdByClient = new Map<WebSocket, string>();
 	let clineSessionContextVersion = 0;
 	const runtimeStateWebSocketServer = new WebSocketServer({ noServer: true });
+	const wsPingInterval = setInterval(() => {
+		for (const client of runtimeStateClients) {
+			if (client.readyState === WebSocket.OPEN) {
+				client.ping();
+			}
+		}
+	}, 30_000);
 	const workspaceMetadataMonitor = createWorkspaceMetadataMonitor({
 		onMetadataUpdated: (workspaceId, workspaceMetadata) => {
 			const clients = runtimeStateClientsByWorkspaceId.get(workspaceId);
@@ -576,6 +583,7 @@ export function createRuntimeStateHub(deps: CreateRuntimeStateHubDependencies): 
 			runtimeStateClients.clear();
 			runtimeStateClientsByWorkspaceId.clear();
 			runtimeStateWorkspaceIdByClient.clear();
+			clearInterval(wsPingInterval);
 			await new Promise<void>((resolveCloseWebSockets) => {
 				runtimeStateWebSocketServer.close(() => {
 					resolveCloseWebSockets();

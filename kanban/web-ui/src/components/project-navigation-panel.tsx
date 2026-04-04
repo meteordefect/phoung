@@ -162,7 +162,7 @@ export function ProjectNavigationPanel({
 				<div>
 					<div className="font-semibold text-base flex items-baseline gap-1.5">
 						<ClineIcon size={18} className="text-text-primary shrink-0 self-center" />
-						Cline <span className="text-text-secondary font-normal text-xs">v{__APP_VERSION__}</span>
+						phoung <span className="text-text-secondary font-normal text-xs">v{__APP_VERSION__}</span>
 					</div>
 				</div>
 				<div className="mt-2 rounded-md bg-surface-2 p-1">
@@ -191,14 +191,14 @@ export function ProjectNavigationPanel({
 								!canShowAgentSection ? "cursor-not-allowed opacity-50" : null,
 							)}
 						>
-							Kanban Agent
+							Phoung
 						</button>
 					</div>
 				</div>
 				{activeSection === "agent" ? (
 					<p className="text-text-tertiary text-xs" style={{ padding: "8px 4px 0" }}>
-						Add tasks, link dependencies, break work down, and manage your board. Try asking to
-						create and link some tasks to get started.
+						Plan work, create tasks, and manage your board. Phoung remembers your projects and
+						can break features into actionable tasks.
 					</p>
 				) : null}
 			</div>

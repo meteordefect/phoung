@@ -1303,6 +1303,37 @@ const clineAdapter: AgentSessionAdapter = {
 	},
 };
 
+function buildPiHookExtensionContent(
+	toReviewCommand: string,
+	toInProgressCommand: string,
+	activityCommand: string,
+): string {
+	return `import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import { spawn } from "node:child_process";
+
+function runHook(command: string) {
+	try {
+		const child = spawn("sh", ["-c", command], { stdio: "ignore", detached: true });
+		child.unref();
+	} catch {}
+}
+
+export default function (pi: ExtensionAPI) {
+	pi.on("agent_start", async () => {
+		runHook(${JSON.stringify(toInProgressCommand)});
+	});
+
+	pi.on("agent_end", async () => {
+		runHook(${JSON.stringify(toReviewCommand)});
+	});
+
+	pi.on("tool_result", async () => {
+		runHook(${JSON.stringify(activityCommand)});
+	});
+}
+`;
+}
+
 const piAdapter: AgentSessionAdapter = {
 	async prepare(input) {
 		const args = [...input.args];
@@ -1320,6 +1351,20 @@ const piAdapter: AgentSessionAdapter = {
 
 		const hooks = resolveHookContext(input);
 		if (hooks) {
+			const extensionPath = join(getHookAgentDirectory("pi"), "kanban-hooks.ts");
+
+			const extensionContent = buildPiHookExtensionContent(
+				buildHooksCommand(["notify", "--event", "to_review", "--source", "pi"]),
+				buildHooksCommand(["notify", "--event", "to_in_progress", "--source", "pi"]),
+				buildHooksCommand(["notify", "--event", "activity", "--source", "pi"]),
+			);
+
+			await ensureTextFile(extensionPath, extensionContent);
+
+			if (!hasCliOption(args, "--extension") && !hasCliOption(args, "-e")) {
+				args.push("-e", extensionPath);
+			}
+
 			Object.assign(
 				env,
 				createHookRuntimeEnv({

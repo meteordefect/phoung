@@ -21,6 +21,9 @@ import type { TerminalSessionManager } from "../terminal/session-manager.js";
 import { createTerminalWebSocketBridge } from "../terminal/ws-server.js";
 import { type RuntimeTrpcContext, type RuntimeTrpcWorkspaceScope, runtimeAppRouter } from "../trpc/app-router.js";
 import { createHooksApi } from "../trpc/hooks-api.js";
+import { createMemoryApi } from "../trpc/memory-api.js";
+import { createBoardOperations, createPhoungApi } from "../trpc/phoung-api.js";
+import { phoungChatStream } from "../manager/phoung-session.js";
 import { createProjectsApi } from "../trpc/projects-api.js";
 import { createRuntimeApi } from "../trpc/runtime-api.js";
 import { createWorkspaceApi } from "../trpc/workspace-api.js";
@@ -162,6 +165,9 @@ export async function createRuntimeServer(deps: CreateRuntimeServerDependencies)
 		deps.workspaceRegistry.clearActiveWorkspace();
 	};
 
+	const memoryApi = createMemoryApi();
+	const phoungApi = createPhoungApi();
+
 	const createTrpcContext = async (req: IncomingMessage): Promise<RuntimeTrpcContext> => {
 		const requestUrl = new URL(req.url ?? "/", "http://localhost");
 		const scope = await resolveWorkspaceScopeFromRequest(req, requestUrl);
@@ -216,6 +222,8 @@ export async function createRuntimeServer(deps: CreateRuntimeServerDependencies)
 				broadcastRuntimeWorkspaceStateUpdated: deps.runtimeStateHub.broadcastRuntimeWorkspaceStateUpdated,
 				broadcastTaskReadyForReview: deps.runtimeStateHub.broadcastTaskReadyForReview,
 			}),
+			memoryApi,
+			phoungApi,
 		};
 	};
 
@@ -245,6 +253,51 @@ export async function createRuntimeServer(deps: CreateRuntimeServerDependencies)
 					res.end('{"error":"Unauthorized"}');
 					return;
 				}
+			}
+			if (pathname === "/api/phoung/chat" && req.method === "POST") {
+				const chunks: Buffer[] = [];
+				for await (const chunk of req) {
+					chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
+				}
+				const body = JSON.parse(Buffer.concat(chunks).toString("utf-8"));
+				const { message, conversation_id, model } = body as {
+					message?: string;
+					conversation_id?: string;
+					model?: string;
+				};
+				if (!message) {
+					res.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
+					res.end('{"error":"message is required"}');
+					return;
+				}
+				const convId = conversation_id || `conv-${Date.now()}`;
+				const workspacePath = deps.workspaceRegistry.getActiveWorkspacePath();
+				const activeWorkspaceId = deps.workspaceRegistry.getActiveWorkspaceId();
+				if (!workspacePath || !activeWorkspaceId) {
+					res.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
+					res.end('{"error":"No active workspace"}');
+					return;
+				}
+				res.writeHead(200, {
+					"Content-Type": "text/event-stream",
+					"Cache-Control": "no-cache",
+					Connection: "keep-alive",
+					"X-Accel-Buffering": "no",
+				});
+				const boardOps = createBoardOperations(workspacePath, () => {
+					void deps.runtimeStateHub.broadcastRuntimeWorkspaceStateUpdated(activeWorkspaceId, workspacePath);
+				});
+				const send = (event: Record<string, unknown>) => {
+					res.write(`data: ${JSON.stringify(event)}\n\n`);
+				};
+				try {
+					await phoungChatStream(message, convId, boardOps, send, model);
+					send({ type: "done", conversation_id: convId });
+				} catch (err) {
+					send({ type: "error", message: err instanceof Error ? err.message : String(err) });
+				}
+				res.end();
+				return;
 			}
 			if (pathname.startsWith("/api/trpc")) {
 				await trpcHttpHandler(req, res);

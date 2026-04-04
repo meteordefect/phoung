@@ -11,6 +11,8 @@ Restart=on-failure
 RestartSec=5
 Environment=NODE_ENV=production
 EnvironmentFile={{ kanban_env_file }}
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=multi-user.target
