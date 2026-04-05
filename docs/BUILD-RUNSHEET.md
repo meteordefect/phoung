@@ -1,6 +1,6 @@
 # Build Runsheet
 
-Step-by-step execution plan for the Phoung/Kanban rebuild. Each phase produces a working checkpoint. Do not skip phases — each depends on the previous.
+Step-by-step execution plan for the Phuong/Kanban rebuild. Each phase produces a working checkpoint. Do not skip phases — each depends on the previous.
 
 ## Phase 1: Import Kanban and boot locally ✅
 
@@ -282,9 +282,9 @@ External memory repo is live, readable by the app, auto-backed-up. Commit.
 
 ---
 
-## Phase 6: Add Phoung manager service
+## Phase 6: Add Phuong manager service
 
-### 6.1 Create Phoung service module
+### 6.1 Create Phuong service module
 
 File: `kanban/src/manager/` (new directory)
 
@@ -294,9 +294,9 @@ Port from `archive/v1/main-agent/src/phoung.ts`:
 - `phoung-tools.ts` — custom tools (create task on board, update task, load memory, create memory)
 - `phoung-context.ts` — selective context assembly (system prompt + overview + relevant project context + relevant memories)
 
-Key adaptation: Phoung's tools now operate on the Kanban board (via workspace state save API) instead of the old file-based task system.
+Key adaptation: Phuong's tools now operate on the Kanban board (via workspace state save API) instead of the old file-based task system.
 
-### 6.2 Add Phoung tRPC procedures
+### 6.2 Add Phuong tRPC procedures
 
 File: `kanban/src/trpc/app-router.ts`
 
@@ -309,44 +309,44 @@ Add a `phoung` sub-router:
 - `phoung.getModels` — query
 - `phoung.getSessionStats` — query
 
-### 6.3 Add Phoung chat panel to the UI
+### 6.3 Add Phuong chat panel to the UI
 
 File: `kanban/web-ui/src/` (new component)
 
-Add a slide-out or split panel for chatting with Phoung:
+Add a slide-out or split panel for chatting with Phuong:
 
 - text input with send button
 - SSE streaming response display
 - thinking/tool call rendering (reuse patterns from `archive/v1/review-ui/`)
 - conversation history selector
 
-Mount this alongside the board, not replacing it. The board remains the primary surface. The Phoung panel is for planning and delegation.
+Mount this alongside the board, not replacing it. The board remains the primary surface. The Phuong panel is for planning and delegation.
 
-### 6.4 Wire Phoung tools to Kanban board
+### 6.4 Wire Phuong tools to Kanban board
 
-Phoung's `create_task` tool should:
+Phuong's `create_task` tool should:
 
 1. read current workspace state via `workspace.getState`
 2. add a new card to the backlog column
 3. save via `workspace.saveState`
 
-Phoung's `start_task` tool should:
+Phuong's `start_task` tool should:
 
 1. trigger `runtime.startTaskSession` for the card
 
-This makes Phoung a first-class board operator.
+This makes Phuong a first-class board operator.
 
 ### 6.5 Verify
 
-- open the Phoung panel
+- open the Phuong panel
 - send "create a task to add a README to project X"
-- Phoung creates a card on the board
+- Phuong creates a card on the board
 - start the task — pi runs it
-- Phoung can see task status
+- Phuong can see task status
 
 ### 6.6 Checkpoint
 
-Phoung is integrated as the manager. You can chat with Phoung and it manages the board. Commit.
+Phuong is integrated as the manager. You can chat with Phuong and it manages the board. Commit.
 
 ---
 
@@ -371,15 +371,15 @@ File: `kanban/src/memory/task-lifecycle.ts`
 
 Subscribe to Kanban workspace state changes. When a task transitions state, write the appropriate record to the project memory.
 
-### 7.3 Wire to Phoung
+### 7.3 Wire to Phuong
 
-Phoung should read recent task outcomes when planning new work. Add task history to the context assembly in `phoung-context.ts`.
+Phuong should read recent task outcomes when planning new work. Add task history to the context assembly in `phoung-context.ts`.
 
 ### 7.4 Verify
 
 - complete a task through the full cycle
 - check `/data/phoung-memory/projects/<project>/tasks/` for the written record
-- verify Phoung can reference past task outcomes in conversation
+- verify Phuong can reference past task outcomes in conversation
 
 ### 7.5 Checkpoint
 
@@ -437,11 +437,11 @@ clawdeploy/
 │   │   ├── server/            # runtime server (with Clerk auth)
 │   │   ├── terminal/          # agent adapters (with pi adapter)
 │   │   ├── trpc/              # app router (with phoung + memory sub-routers)
-│   │   ├── manager/           # NEW: Phoung session, tools, context
+│   │   ├── manager/           # NEW: Phuong session, tools, context
 │   │   ├── memory/            # NEW: memory service, loader, sync
 │   │   └── ...                # upstream Kanban modules
 │   ├── web-ui/
-│   │   ├── src/               # Kanban UI + Clerk + Phoung panel
+│   │   ├── src/               # Kanban UI + Clerk + Phuong panel
 │   │   └── ...
 │   ├── package.json
 │   └── ...
@@ -459,7 +459,7 @@ clawdeploy/
 │   ├── ARCHITECTURE.md        # old arch (reference)
 │   └── research/              # upstream research snapshots
 ├── archive/
-│   └── v1/                    # old Phoung stack (reference only)
+│   └── v1/                    # old Phuong stack (reference only)
 ├── .gitignore
 └── README.md
 ```

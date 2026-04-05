@@ -2,15 +2,15 @@
 
 ## Goal
 
-Separate Phoung's memory files into their own Git repository (`meteordefect/base-control`) so the brain is independent of the application code. The memory is the most valuable asset — it should outlive any specific tool, be portable, backed up, and version-controlled independently.
+Separate Phuong's memory files into their own Git repository (`meteordefect/base-control`) so the brain is independent of the application code. The memory is the most valuable asset — it should outlive any specific tool, be portable, backed up, and version-controlled independently.
 
 ## Why
 
-- **Portability** — If we outgrow Phoung or build a v2, the memory repo just gets pointed at the new system. Knowledge persists.
+- **Portability** — If we outgrow Phuong or build a v2, the memory repo just gets pointed at the new system. Knowledge persists.
 - **Backup** — A cron auto-commits and pushes hourly. Full git history of every decision, memory, and conversation.
-- **Multi-device** — VPS runs the primary. Local can pull the same repo for read access or running Phoung locally.
+- **Multi-device** — VPS runs the primary. Local can pull the same repo for read access or running Phuong locally.
 - **Clean deploys** — `clawdeploy` can be torn down and redeployed without touching the brain.
-- **Audit trail** — Git blame shows when Phoung learned something and in what context.
+- **Audit trail** — Git blame shows when Phuong learned something and in what context.
 
 ## What Moves
 
@@ -107,7 +107,7 @@ docker compose down && docker compose up -d
 
 ### Step 5: Verify
 
-- Open the review-ui, start a conversation — confirm Phoung loads its system prompt and knows its projects
+- Open the review-ui, start a conversation — confirm Phuong loads its system prompt and knows its projects
 - Check that modes show up (the skills are loading from the new location)
 - Confirm task listing works
 
@@ -136,6 +136,6 @@ This runs hourly, only commits when there are actual changes.
 
 ## Future Considerations
 
-- **Local development**: Clone `base-control` locally, point `MEMORY_DIR` at it, run Phoung in simple mode without Docker
+- **Local development**: Clone `base-control` locally, point `MEMORY_DIR` at it, run Phuong in simple mode without Docker
 - **Multiple agents**: Other tools or agents could read/write to the same memory repo
 - **Memory pruning**: Old conversation logs and completed tasks could be archived to a separate branch or pruned periodically to keep the repo lean

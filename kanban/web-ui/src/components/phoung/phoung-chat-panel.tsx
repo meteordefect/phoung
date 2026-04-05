@@ -287,7 +287,7 @@ export function PhoungChatPanel({ workspaceId }: PhoungChatPanelProps) {
 	if (!workspaceId) {
 		return (
 			<div className="flex h-full items-center justify-center px-3 text-center text-sm text-text-secondary">
-				Select a project to start chatting with Phoung.
+				Select a project to start chatting with Phuong.
 			</div>
 		);
 	}
@@ -407,7 +407,7 @@ export function PhoungChatPanel({ workspaceId }: PhoungChatPanelProps) {
 			<div className="flex-1 min-w-0 overflow-y-auto px-2 py-2 space-y-3">
 				{messages.length === 0 && (
 					<div className="flex h-full items-center justify-center text-center text-xs text-text-tertiary px-4">
-						Ask Phoung to plan work, break down features, or manage your board.
+						Ask Phuong to plan work, break down features, or manage your board.
 					</div>
 				)}
 				{messages.map((msg, i) => (
@@ -444,7 +444,7 @@ export function PhoungChatPanel({ workspaceId }: PhoungChatPanelProps) {
 						value={input}
 						onChange={(e) => setInput(e.target.value)}
 						onKeyDown={handleKeyDown}
-						placeholder="Ask Phoung to plan, create, or manage tasks"
+						placeholder="Ask Phuong to plan, create, or manage tasks"
 						rows={1}
 						disabled={isStreaming}
 						className="flex-1 resize-none bg-transparent text-sm text-text-primary placeholder:text-text-tertiary outline-none disabled:opacity-50"

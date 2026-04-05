@@ -309,7 +309,7 @@ export function resolveHomeAgentAppendSystemPrompt(
 export function renderTaskAgentAppendSystemPrompt(): string {
 	return `# Kanban Task Workflow
 
-You are a coding agent executing a task on a Kanban board. This task was created either by Phoung (an AI project manager) or manually by the project founder. You are working in a dedicated git worktree branch managed by the Kanban system.
+You are a coding agent executing a task on a Kanban board. This task was created either by Phuong (an AI project manager) or manually by the project founder. You are working in a dedicated git worktree branch managed by the Kanban system.
 
 ## Git rules
 

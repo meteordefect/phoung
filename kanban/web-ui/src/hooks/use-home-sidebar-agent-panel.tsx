@@ -168,7 +168,7 @@ export function useHomeSidebarAgentPanel({
 				incomingMessage={latestHomeTaskChatMessage}
 				incomingMessages={homeTaskChatMessages}
 				showRightBorder={false}
-				composerPlaceholder="Ask Phoung to plan, create, or manage tasks"
+				composerPlaceholder="Ask Phuong to plan, create, or manage tasks"
 			/>
 		);
 	}
@@ -201,7 +201,7 @@ export function useHomeSidebarAgentPanel({
 
 	return (
 		<div className="flex w-full items-center justify-center rounded-md border border-border bg-surface-2 px-3 text-center text-sm text-text-secondary">
-			Select a provider in Settings to start chatting with Phoung.
+			Select a provider in Settings to start chatting with Phuong.
 		</div>
 	);
 }

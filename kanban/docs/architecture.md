@@ -388,7 +388,7 @@ The most important reason is that the fork-specific behavior is concentrated in 
 - `web-ui/src/terminal/persistent-terminal-manager.ts`
 - `src/cline-sdk/`
 
-When upstream changes land, those are the files to inspect first. In most cases the right strategy is to take upstream behavior first, then re-apply Phoung- or `pi`-specific integration only where the fork still needs it.
+When upstream changes land, those are the files to inspect first. In most cases the right strategy is to take upstream behavior first, then re-apply Phuong- or `pi`-specific integration only where the fork still needs it.
 
 ### Kanban upstream strategy
 

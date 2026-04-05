@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
-# SSL Setup Script for Phoung
+# SSL Setup Script for Phuong
 # This script helps set up HTTPS for your domain
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -140,7 +140,7 @@ show_next_steps() {
     echo ""
     log_success "SSL Setup Complete!"
     echo ""
-    log_info "Your Phoung is now available at:"
+    log_info "Your Phuong is now available at:"
     echo "  ${GREEN}https://$DOMAIN${NC}"
     echo ""
     log_info "Login credentials:"
@@ -170,7 +170,7 @@ show_next_steps() {
 main() {
     echo ""
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo "  Phoung SSL Setup"
+    echo "  Phuong SSL Setup"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo ""
 

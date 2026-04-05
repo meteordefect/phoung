@@ -8,8 +8,8 @@ End state:
 
 - you open a secure web app hosted on your VPS
 - the app is your forked Kanban UI and runtime
-- `Phoung` is the manager agent you talk to
-- `Phoung` plans work, breaks it into tasks, and manages task flow
+- `Phuong` is the manager agent you talk to
+- `Phuong` plans work, breaks it into tasks, and manages task flow
 - `pi` is the worker agent used for Kanban task execution
 - `GLM-5` is the default execution model for `pi`
 - memories live outside this repo in separate git-backed memory repositories
@@ -27,7 +27,7 @@ The following are now considered decided for `v1`:
 - the primary runtime lives on the VPS
 - the Kanban code is imported permanently into this repo and becomes the main product base
 - memory lives outside this repo in a separate git-backed repository on the VPS
-- `Phoung` is the manager and planner
+- `Phuong` is the manager and planner
 - `pi` is the default worker runtime
 - `GLM-5` via `ZAI` is the default worker model
 - `pi` is integrated through a structured process integration path, with `RPC` as the preferred implementation shape
@@ -46,8 +46,8 @@ This system is not just "Kanban with a chat box". It is a hosted manager-and-wor
 
 - You log into a secure web UI on the VPS.
 - The main surface is your forked Kanban board.
-- A manager panel lets you chat with `Phoung`.
-- `Phoung` can create, prioritize, link, and start tasks on the board.
+- A manager panel lets you chat with `Phuong`.
+- `Phuong` can create, prioritize, link, and start tasks on the board.
 - When a task runs, Kanban creates an isolated worktree and launches `pi`.
 - `pi` works the task using `GLM-5`.
 - Review, diffs, comments, commits, and PR actions happen through the Kanban UI.
@@ -56,7 +56,7 @@ This system is not just "Kanban with a chat box". It is a hosted manager-and-wor
 ### Platform definition
 
 - imported `Kanban` code is the execution substrate and operator UI.
-- `Phoung` is the planning and orchestration layer.
+- `Phuong` is the planning and orchestration layer.
 - `Memory repos` are the durable knowledge layer.
 - `pi` is the default worker runtime.
 - `VPS` is the primary runtime host.
@@ -132,9 +132,9 @@ That means:
 
 ### 4. Manager and worker are different roles
 
-`Phoung` is not a task worker.
+`Phuong` is not a task worker.
 
-`Phoung`:
+`Phuong`:
 
 - reads broad context
 - decides project relevance
@@ -194,7 +194,7 @@ Upstream base:
 - add new product-specific capabilities behind clear seams
 - preserve enough history and structure that upstream comparison remains possible
 
-## Layer 3: Manager service (`Phoung`)
+## Layer 3: Manager service (`Phuong`)
 
 This becomes a first-class service connected to the Kanban fork.
 
@@ -208,7 +208,7 @@ Responsibilities:
 - deciding which memories to load
 - deciding which task context to inject
 
-`Phoung` should operate as a manager-control plane above Kanban, not as a replacement for Kanban runtime internals.
+`Phuong` should operate as a manager-control plane above Kanban, not as a replacement for Kanban runtime internals.
 
 ## Layer 4: Worker runtime (`pi`)
 
@@ -314,7 +314,7 @@ Or, if one memory repo per tenant plus project structure inside it:
 
 ## Selective loading design
 
-`Phoung` should continue the selective memory pattern:
+`Phuong` should continue the selective memory pattern:
 
 1. load system and overview context
 2. identify relevant project(s)
@@ -352,8 +352,8 @@ Suggested storage:
 
 Suggested behavior:
 
-- `Phoung` creates or updates `PI`
-- `Phoung` emits executable task cards into Kanban
+- `Phuong` creates or updates `PI`
+- `Phuong` emits executable task cards into Kanban
 - task completion status rolls back up into `PI`
 
 ## Security Model
@@ -397,7 +397,7 @@ Target production stack:
 - reverse proxy
 - web UI
 - Kanban runtime API/server
-- manager service (`Phoung`)
+- manager service (`Phuong`)
 - memory service
 - worker launcher / container orchestrator
 - optional database for auth, tenant metadata, and operational records
@@ -432,7 +432,7 @@ This repo becomes the home of the imported Kanban code and the hosted product bu
 
 Keep:
 
-- `Phoung` as manager concept
+- `Phuong` as manager concept
 - selective context loading idea
 - external memory repo idea
 - project-scoped context organization
@@ -515,7 +515,7 @@ This track must happen before exposing the app publicly.
 
 > Done — Clerk auth integrated. Client-side gate in `web-ui/src/auth/`, server-side JWT verification in `src/auth/clerk-verify.ts`. All HTTP API and WebSocket paths protected. Tenant scoping deferred to multi-user phase.
 
-## Track C: Add `Phoung` manager service
+## Track C: Add `Phuong` manager service
 
 Goal:
 
@@ -683,12 +683,12 @@ Outcome:
 - memory service owns reads/writes
 - backups and git sync jobs are live
 
-## Phase 6: Add Phoung manager service
+## Phase 6: Add Phuong manager service
 
 Outcome:
 
-- `Phoung` chat exists inside the hosted product
-- `Phoung` can create and manipulate board tasks
+- `Phuong` chat exists inside the hosted product
+- `Phuong` can create and manipulate board tasks
 
 ## Phase 7: Connect memory to task lifecycle
 
@@ -753,7 +753,7 @@ Build in this order (revised to match actual execution):
 3. ✅ add Clerk auth (Tailscale step dropped — going straight to public Clerk-gated access)
 4. ✅ deploy to VPS with public HTTPS + Clerk (systemd, nginx, TLS, pi, UFW)
 5. ✅ externalize memory service and backup jobs
-6. add `Phoung` manager service and chat surface ← **next**
+6. add `Phuong` manager service and chat surface ← **next**
 7. connect memory to task lifecycle
 8. production hardening (systemd, Ansible, backups, monitoring)
 
@@ -764,8 +764,8 @@ The migration is complete when all of the following are true:
 - the primary system runs on the VPS
 - you can securely log in through the browser
 - the main UI is your Kanban-based product
-- you can chat with `Phoung` inside the product
-- `Phoung` can create and manage task flows
+- you can chat with `Phuong` inside the product
+- `Phuong` can create and manage task flows
 - Kanban tasks execute through `pi`
 - `GLM-5` is the default worker model
 - `ZAI` is the default worker provider
@@ -778,4 +778,4 @@ The migration is complete when all of the following are true:
 
 The technical implementation plan is `docs/BUILD-RUNSHEET.md`. It contains step-by-step execution instructions for each phase.
 
-Current status: Phases 1–5 complete. The system is live at `beta.friendlabs.ai` with Clerk auth, pi task execution (ZAI/GLM), full deploy automation, and external memory service. Next action is Phase 6 — adding the Phoung manager service and chat surface.
+Current status: Phases 1–5 complete. The system is live at `beta.friendlabs.ai` with Clerk auth, pi task execution (ZAI/GLM), full deploy automation, and external memory service. Next action is Phase 6 — adding the Phuong manager service and chat surface.

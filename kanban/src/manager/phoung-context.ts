@@ -7,13 +7,13 @@ import {
 
 export function assemblePhoungSystemPrompt(): string {
 	if (!isMemoryConfigured()) {
-		return "You are Phoung, a project manager agent. You help plan work, create tasks, and manage the board.";
+		return "You are Phuong, a project manager agent. You help plan work, create tasks, and manage the board.";
 	}
 
 	const systemPrompt = loadSystemPrompt();
 	if (systemPrompt) return systemPrompt;
 
-	return "You are Phoung, a project manager agent. You help plan work, create tasks, and manage the board.";
+	return "You are Phuong, a project manager agent. You help plan work, create tasks, and manage the board.";
 }
 
 export function assemblePhoungContext(): string {

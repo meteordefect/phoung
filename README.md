@@ -1,6 +1,6 @@
-# Phoung
+# Phuong
 
-A hosted AI project manager built on a [Kanban](https://github.com/cline/kanban) fork. You chat with Phoung through a secure web dashboard. Phoung plans work, creates tasks on a visual board, and launches `pi` coding agents in isolated worktrees on your VPS. Project memory lives in a separate git-backed repository.
+A hosted AI project manager built on a [Kanban](https://github.com/cline/kanban) fork. You chat with Phuong through a secure web dashboard. Phuong plans work, creates tasks on a visual board, and launches `pi` coding agents in isolated worktrees on your VPS. Project memory lives in a separate git-backed repository.
 
 ## Status
 
@@ -9,7 +9,7 @@ Rebuilding. See `docs/BUILD-RUNSHEET.md` for the step-by-step execution plan.
 ## Architecture
 
 - **Kanban fork** — task board, worktree lifecycle, agent runtime, review/diff UI
-- **Phoung** — manager agent (chat, planning, task decomposition, memory retrieval)
+- **Phuong** — manager agent (chat, planning, task decomposition, memory retrieval)
 - **pi** — worker agent (executes coding tasks in worktrees using GLM-5 via ZAI)
 - **Memory** — external git repo (`base-control`), never in this repo
 - **Auth** — Clerk with server-side JWT verification
@@ -40,7 +40,7 @@ When upstream `cline/kanban` ships useful fixes:
    - `kanban/src/terminal/agent-session-adapters.ts`
    - `kanban/src/server/runtime-state-hub.ts`
    - `kanban/web-ui/src/terminal/persistent-terminal-manager.ts`
-4. Prefer taking upstream behavior first, then re-applying Phoung- and `pi`-specific logic only where still needed.
+4. Prefer taking upstream behavior first, then re-applying Phuong- and `pi`-specific logic only where still needed.
 5. Re-run the Kanban tests and manually verify task start, review-ready transitions, terminal behavior, and sidebar chat behavior.
 
 ### pi and Cline updates
@@ -54,4 +54,4 @@ Keep custom behavior isolated to clear seams instead of scattering fork logic th
 
 ## Previous Version
 
-The v1 Phoung stack (Express API, React review UI, Docker subagents) is archived in `archive/v1/` for reference.
+The v1 Phuong stack (Express API, React review UI, Docker subagents) is archived in `archive/v1/` for reference.

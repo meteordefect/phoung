@@ -1,5 +1,5 @@
 ---
-- name: Deploy Kanban Fork (Phoung v5)
+- name: Deploy Kanban Fork (Phuong v5)
   hosts: control_plane
   become: yes
 
@@ -147,7 +147,7 @@
         state: absent
       notify: Reload Nginx
 
-    - name: Remove old Phoung nginx site (if present)
+    - name: Remove old Phuong nginx site (if present)
       file:
         path: /etc/nginx/sites-enabled/phoung
         state: absent

@@ -178,7 +178,7 @@ export function ProjectNavigationPanel({
 				<div>
 					<div className="font-semibold text-base flex items-baseline gap-1.5">
 						<ClineIcon size={18} className="text-text-primary shrink-0 self-center" />
-						phoung <span className="text-text-secondary font-normal text-xs">v{__APP_VERSION__}</span>
+						phuong <span className="text-text-secondary font-normal text-xs">v{__APP_VERSION__}</span>
 					</div>
 				</div>
 				<div className="mt-2 rounded-md bg-surface-2 p-1">
@@ -207,14 +207,14 @@ export function ProjectNavigationPanel({
 								!canShowAgentSection ? "cursor-not-allowed opacity-50" : null,
 							)}
 						>
-							Phoung
-						</button>
+						Phuong
+					</button>
 					</div>
 				</div>
 				{activeSection === "agent" ? (
 					<div className="flex items-start gap-2" style={{ padding: "8px 4px 0" }}>
 						<p className="flex-1 text-text-tertiary text-xs">
-							Plan work, create tasks, and manage your board. Phoung remembers your projects and
+							Plan work, create tasks, and manage your board. Phuong remembers your projects and
 							can break features into actionable tasks.
 						</p>
 						<Button

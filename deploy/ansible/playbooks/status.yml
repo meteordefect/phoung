@@ -1,5 +1,5 @@
 ---
-- name: Check Phoung Status
+- name: Check Phuong Status
   hosts: control_plane
   become: yes
   

@@ -1,5 +1,5 @@
 ---
-- name: Deploy Phoung Control Plane
+- name: Deploy Phuong Control Plane
   hosts: control_plane
   become: yes
   

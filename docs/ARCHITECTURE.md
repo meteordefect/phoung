@@ -1,14 +1,14 @@
-# Phoung — Architecture
+# Phuong — Architecture
 
 ## Overview
 
-Phoung is a project manager agent for coding work. You chat with Phoung through a review dashboard. Phoung creates tasks, spawns coding sub-agents in gVisor-sandboxed Docker containers with mounted repo workspaces, and opens merge requests for your approval. All state is file-based — no database required.
+Phuong is a project manager agent for coding work. You chat with Phuong through a review dashboard. Phuong creates tasks, spawns coding sub-agents in gVisor-sandboxed Docker containers with mounted repo workspaces, and opens merge requests for your approval. All state is file-based — no database required.
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │                         YOU (Human)                          │
 │                                                              │
-│   Chat with Phoung ◄──────────► Review UI                    │
+│   Chat with Phuong ◄──────────► Review UI                    │
 │   (business context,             (tasks, diffs,              │
 │    task assignment)                merge/reject)              │
 └──────────┬───────────────────────────┬───────────────────────┘
@@ -39,15 +39,15 @@ Phoung is a project manager agent for coding work. You chat with Phoung through 
 
 ## Context Engineering
 
-Phoung uses a two-layer context architecture to keep agent context windows small while providing full project awareness.
+Phuong uses a two-layer context architecture to keep agent context windows small while providing full project awareness.
 
 ### Layer 1: Company Knowledge Graph (`memory/`)
 
-Phoung's knowledge of the entire organization. Loaded selectively — Phoung reads the overview first, then drills into only the relevant project.
+Phuong's knowledge of the entire organization. Loaded selectively — Phuong reads the overview first, then drills into only the relevant project.
 
 ```
 memory/
-├── system-prompt.md           # Phoung identity and rules
+├── system-prompt.md           # Phuong identity and rules
 ├── subagent-prompt.md         # Sub-agent template
 ├── overview.md                # All projects overview
 ├── org/
@@ -63,14 +63,14 @@ memory/
 └── logs/                      # Cron logs
 ```
 
-**Loading hierarchy** — Phoung goes deeper only as needed:
+**Loading hierarchy** — Phuong goes deeper only as needed:
 
 | Level | What | When loaded |
 |-------|------|-------------|
 | 0 | `system-prompt.md` | Always (~1KB) |
 | 1 | `overview.md` | Always (~2KB) |
-| 2 | `projects/<name>/context.md` | When Phoung identifies the relevant project |
-| 3 | `projects/<name>/memories/` | Phoung scans filenames, loads only what's relevant |
+| 2 | `projects/<name>/context.md` | When Phuong identifies the relevant project |
+| 3 | `projects/<name>/memories/` | Phuong scans filenames, loads only what's relevant |
 
 ### Layer 2: Per-Project Context (in each repo)
 
@@ -87,7 +87,7 @@ project-repo/
 └── src/
 ```
 
-During spawn, Phoung can also inject relevant company-level context from `memory/` into the workspace at `.clawdeploy/injected/`.
+During spawn, Phuong can also inject relevant company-level context from `memory/` into the workspace at `.clawdeploy/injected/`.
 
 ---
 
@@ -120,7 +120,7 @@ All three services run on an internal bridge network. Nginx exposes port 8080.
 | Module | Purpose |
 |--------|---------|
 | `phoung.ts` | Session lifecycle, model routing (Kimi, ZAI, Anthropic), stream handling |
-| `extension.ts` | Custom tool definitions exposed to Phoung |
+| `extension.ts` | Custom tool definitions exposed to Phuong |
 | `spawner.ts` | Docker/gVisor orchestration — worktree bind mount, post-exit push/PR, cleanup |
 | `repos.ts` | Local repo management — clone, pull, git worktrees, context injection |
 | `memory.ts` | Task files, conversation files, activity logs, memory documents |
@@ -159,8 +159,8 @@ All three services run on an internal bridge network. Nginx exposes port 8080.
 ### Chat Flow
 
 1. You send a message in the review UI.
-2. API streams request to a Phoung session.
-3. Phoung can call custom tools (`spawn_subagent`, `register_project`, `update_task`, etc.).
+2. API streams request to a Phuong session.
+3. Phuong can call custom tools (`spawn_subagent`, `register_project`, `update_task`, etc.).
 4. Responses stream back to the UI via SSE.
 
 ### Spawn Flow
@@ -187,20 +187,20 @@ Key points:
 
 | Mode | Trigger | Behavior |
 |------|---------|----------|
-| Live chat | You type a message | Phoung responds conversationally, can spawn agents immediately |
-| Cron wake-up | `POST /cron/wake` | Phoung reads task list, processes queue, writes results to files |
+| Live chat | You type a message | Phuong responds conversationally, can spawn agents immediately |
+| Cron wake-up | `POST /cron/wake` | Phuong reads task list, processes queue, writes results to files |
 
 ### Human-in-the-Loop
 
-- Phoung never merges PRs — only you do, through the review UI.
-- When Phoung encounters something it can't resolve, it uses `ask_human` to pause and wait for your input.
+- Phuong never merges PRs — only you do, through the review UI.
+- When Phuong encounters something it can't resolve, it uses `ask_human` to pause and wait for your input.
 - The `ask_human` tool supports two modes: `notify` (agent continues) and `handoff` (agent waits for reply).
 
 ---
 
 ## Tool Definitions
 
-Phoung uses native pi-mono tool calls. Custom tools:
+Phuong uses native pi-mono tool calls. Custom tools:
 
 | Tool | Purpose |
 |------|---------|
@@ -247,7 +247,7 @@ Three-panel IDE-style layout with persistent sidebar and collapsible log drawer.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
-│  Phoung                                     [model] [new chat] [⚙]  │
+│  Phuong                                     [model] [new chat] [⚙]  │
 ├────────────┬─────────────────────────────────┬───────────────────────┤
 │            │                                 │                       │
 │  SIDEBAR   │         MAIN CONTENT            │    CONTEXT PANEL      │
@@ -305,11 +305,11 @@ Sub-agent containers run with gVisor (`runsc`) for user-space kernel isolation. 
 - Sub-agents can only push to feature branches: `task/<task-id>-<slug>`.
 - Push and PR creation happen on the host, not inside the container.
 - GitHub branch protection rules enforce PR review requirements on `main`.
-- Only you can merge — Phoung never merges.
+- Only you can merge — Phuong never merges.
 
 ### Action Guardrails
 
-Phoung's tool calls are defined in code with explicit parameter schemas. There is no freeform action parsing — tools are registered with the pi-mono SDK and validated at call time. Merge operations are only available through the review UI API, never through agent tools.
+Phuong's tool calls are defined in code with explicit parameter schemas. There is no freeform action parsing — tools are registered with the pi-mono SDK and validated at call time. Merge operations are only available through the review UI API, never through agent tools.
 
 ### Resource Limits
 
@@ -323,7 +323,7 @@ All state is stored as files. No database.
 
 | Path | Contents |
 |------|----------|
-| `memory/system-prompt.md` | Phoung identity and operating constraints |
+| `memory/system-prompt.md` | Phuong identity and operating constraints |
 | `memory/subagent-prompt.md` | Worker template used during spawn |
 | `memory/overview.md` | Cross-project context index |
 | `memory/org/` | Company-wide decisions and strategy |

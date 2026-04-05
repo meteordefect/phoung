@@ -193,9 +193,9 @@
         state: directory
         mode: '0755'
 
-    - name: Install hourly cron - wake Phoung
+    - name: Install hourly cron - wake Phuong
       cron:
-        name: "Phoung hourly: wake Phoung"
+        name: "Phuong hourly: wake Phuong"
         minute: "0"
         hour: "*"
         job: "curl -s -X POST http://127.0.0.1:8000/cron/wake >> /var/log/phoung-cron.log 2>&1"
@@ -205,8 +205,8 @@
         name: "{{ item }}"
         state: absent
       loop:
-        - "Phoung hourly: wake Pi"
-        - "Phoung daily: housekeeping"
+        - "Phuong hourly: wake Pi"
+        - "Phuong daily: housekeeping"
 
     - name: Verify services are running
       command: docker compose ps

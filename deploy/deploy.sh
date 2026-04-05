@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
-# Phoung v4 - Deployment Script
+# Phuong v4 - Deployment Script
 # Usage: ./deploy.sh [command]
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -135,7 +135,7 @@ cmd_ansible_migrate() {
 
 # Combined commands
 cmd_init() {
-    log_info "Initializing Phoung Control Plane from scratch..."
+    log_info "Initializing Phuong Control Plane from scratch..."
     
     check_env
     
@@ -166,7 +166,7 @@ cmd_init() {
     log_info "Step 5: Run Database Migrations"
     cmd_ansible_migrate
 
-    log_success "Phoung v4 Control Plane is ready!"
+    log_success "Phuong v4 Control Plane is ready!"
     log_info "Set up Tailscale: ./deploy.sh tailscale-up"
     log_info "Or use SSH tunnel: ./deploy.sh tunnel"
 }
@@ -294,11 +294,11 @@ cmd_deploy_v2() {
         exit 1
     fi
 
-    log_info "Deploying Phoung v2..."
+    log_info "Deploying Phuong v2..."
     cd ansible
     ansible-playbook playbooks/deploy-v2.yml
     cd ..
-    log_success "Phoung v2 deployed!"
+    log_success "Phuong v2 deployed!"
     log_info "Set up Tailscale: ./deploy.sh tailscale-up"
     log_info "Or use SSH tunnel: ./deploy.sh tunnel"
 }
@@ -549,7 +549,7 @@ cmd_check_ssl() {
 
 cmd_help() {
     cat <<EOF
-${GREEN}Phoung v5 - Deployment Tool${NC}
+${GREEN}Phuong v5 - Deployment Tool${NC}
 
 ${BLUE}Usage:${NC}
   ./deploy.sh [command]
@@ -570,7 +570,7 @@ ${BLUE}Terraform Commands:${NC}
   terraform-apply   Apply infrastructure changes
   terraform-destroy Destroy all infrastructure
 
-${BLUE}Phoung v2 (Recommended):${NC}
+${BLUE}Phuong v2 (Recommended):${NC}
   deploy-v2         Deploy the v2 stack (api + review-ui + nginx + subagent)
 
 ${BLUE}Ansible Commands (v3/v4):${NC}

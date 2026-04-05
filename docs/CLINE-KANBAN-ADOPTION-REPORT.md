@@ -2,7 +2,7 @@
 
 ## Scope
 
-This report evaluates whether `cline/kanban` can become the execution and review layer for `clawdeploy`, while preserving the core `Phoung` idea:
+This report evaluates whether `cline/kanban` can become the execution and review layer for `clawdeploy`, while preserving the core `Phuong` idea:
 
 - a separate manager brain
 - memory stored outside the app repo and synced with git
@@ -25,12 +25,12 @@ Yes, this is likely the strongest open-source base available right now for the p
 - board review flow
 - git shipping and task chaining
 
-But it is not a drop-in replacement for `Phoung`.
+But it is not a drop-in replacement for `Phuong`.
 
 The right mental model is:
 
 - `Kanban` can replace most of your current task-board, worktree, task-runtime, and review mechanics.
-- `Phoung` should remain the manager and planner.
+- `Phuong` should remain the manager and planner.
 - your separate git-backed memory repo should remain outside Kanban entirely.
 - `PI` should be implemented as a manager/control-plane layer above Kanban, not by trying to force Kanban's built-in per-task `plan mode` to become full program management.
 
@@ -63,7 +63,7 @@ Kanban is more substantial than the marketing copy suggests. The repo has a real
 
 Your current system has four major responsibilities:
 
-1. `Phoung` as manager/planner/chat surface
+1. `Phuong` as manager/planner/chat surface
 2. file-backed long-term memory
 3. sub-agent execution in isolated workspaces
 4. review and ship flow
@@ -91,7 +91,7 @@ The best-fit architecture is a layered model:
 
 ### Layer 1: Manager brain
 
-Keep `Phoung` as the manager process.
+Keep `Phuong` as the manager process.
 
 Responsibilities:
 
@@ -138,7 +138,7 @@ That means Kanban task sessions should consume:
 
 - repo-local `.clawdeploy/context/*`
 - optionally manager-selected memory excerpts
-- task prompt derived by `Phoung`
+- task prompt derived by `Phuong`
 
 ## What `PI` Should Mean Here
 
@@ -318,7 +318,7 @@ I would not replace `clawdeploy` wholesale in one move.
 
 ### Phase 1: Treat Kanban as a research execution shell
 
-- keep `Phoung` as-is
+- keep `Phuong` as-is
 - keep the separate memory repo
 - prototype a one-way bridge that creates Kanban cards from manager-generated tasks
 - test whether a `pi` task can be launched cleanly through Kanban's agent adapter model
@@ -356,7 +356,7 @@ Only after the substrate works should you add:
 
 The strongest end-state is:
 
-- `Phoung` remains the strategic manager
+- `Phuong` remains the strategic manager
 - `base-control` remains the long-term memory repo
 - Kanban becomes the tactical execution and review engine
 - sub-agent tasks are derived artifacts, not the primary memory objects
@@ -365,7 +365,7 @@ In plain English:
 
 `Kanban` should become your hands.
 
-`Phoung + memory` should remain your brain.
+`Phuong + memory` should remain your brain.
 
 ## Final Recommendation
 
@@ -378,7 +378,7 @@ Do not replace `PI` with Kanban's built-in task `plan mode`.
 The highest-leverage path is:
 
 1. keep manager memory separate and git-backed
-2. keep `Phoung` as the planner/delegator
+2. keep `Phuong` as the planner/delegator
 3. use Kanban for worktrees, task execution, review, and shipping
 4. add a thin bridge or fork that lets manager-created tasks flow into Kanban and task outcomes flow back into memory
 

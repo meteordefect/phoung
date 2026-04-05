@@ -114,7 +114,7 @@ describe("renderTaskAgentAppendSystemPrompt", () => {
 	it("contains task workflow instructions and Kanban context", () => {
 		const rendered = renderTaskAgentAppendSystemPrompt();
 		expect(rendered).toContain("Kanban Task Workflow");
-		expect(rendered).toContain("Phoung");
+		expect(rendered).toContain("Phuong");
 		expect(rendered).toContain("Kanban board");
 		expect(rendered).toContain("dedicated git worktree branch");
 		expect(rendered).toContain("DO NOT push or merge directly to the main or base branch");
