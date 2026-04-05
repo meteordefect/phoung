@@ -1,12 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Send, Loader2, Wrench, AlertCircle } from "lucide-react";
+import { Send, Loader2, Wrench, AlertCircle, ChevronDown } from "lucide-react";
 import { cn } from "@/components/ui/cn";
 import { getSessionToken } from "@/auth/session-token-store";
+import { getRuntimeTrpcClient } from "@/runtime/trpc-client";
 
 interface PhoungMessage {
 	role: "user" | "assistant" | "status" | "error";
 	content: string;
 	toolCalls?: { name: string; result?: string; isError?: boolean }[];
+}
+
+interface PhoungModel {
+	id: string;
+	label: string;
+	isDefault: boolean;
 }
 
 interface PhoungChatPanelProps {
@@ -18,9 +25,26 @@ export function PhoungChatPanel({ workspaceId }: PhoungChatPanelProps) {
 	const [input, setInput] = useState("");
 	const [isStreaming, setIsStreaming] = useState(false);
 	const [conversationId, setConversationId] = useState<string | null>(null);
+	const [availableModels, setAvailableModels] = useState<PhoungModel[]>([]);
+	const [selectedModel, setSelectedModel] = useState<string | null>(null);
 	const messagesEndRef = useRef<HTMLDivElement>(null);
 	const inputRef = useRef<HTMLTextAreaElement>(null);
 	const abortRef = useRef<AbortController | null>(null);
+
+	useEffect(() => {
+		if (!workspaceId) return;
+		const trpcClient = getRuntimeTrpcClient(workspaceId);
+		trpcClient.phoung.getModels
+			.query()
+			.then((models: PhoungModel[]) => {
+				setAvailableModels(models);
+				const defaultModel = models.find((m) => m.isDefault) || models[0];
+				if (defaultModel) {
+					setSelectedModel((prev) => prev ?? defaultModel.id);
+				}
+			})
+			.catch(() => {});
+	}, [workspaceId]);
 
 	useEffect(() => {
 		messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -54,7 +78,7 @@ export function PhoungChatPanel({ workspaceId }: PhoungChatPanelProps) {
 			const res = await fetch("/api/phoung/chat", {
 				method: "POST",
 				headers,
-				body: JSON.stringify({ message: text, conversation_id: convId }),
+				body: JSON.stringify({ message: text, conversation_id: convId, model: selectedModel }),
 				signal: controller.signal,
 			});
 
@@ -148,7 +172,7 @@ export function PhoungChatPanel({ workspaceId }: PhoungChatPanelProps) {
 			setIsStreaming(false);
 			abortRef.current = null;
 		}
-	}, [input, isStreaming, workspaceId, conversationId]);
+	}, [input, isStreaming, workspaceId, conversationId, selectedModel]);
 
 	const handleKeyDown = useCallback(
 		(e: React.KeyboardEvent) => {
@@ -182,6 +206,28 @@ export function PhoungChatPanel({ workspaceId }: PhoungChatPanelProps) {
 				<div ref={messagesEndRef} />
 			</div>
 			<div className="border-t border-border p-2">
+				{availableModels.length > 1 && (
+					<div className="flex items-center gap-1.5 mb-1.5">
+						<div className="relative">
+							<select
+								value={selectedModel ?? ""}
+								onChange={(e) => setSelectedModel(e.target.value)}
+								disabled={isStreaming}
+								className="appearance-none h-6 rounded border border-border bg-surface-1 pl-2 pr-6 text-[11px] text-text-secondary hover:text-text-primary hover:border-border-bright focus:border-border-focus focus:outline-none disabled:opacity-40 cursor-pointer"
+							>
+								{availableModels.map((m) => (
+									<option key={m.id} value={m.id}>
+										{m.label}
+									</option>
+								))}
+							</select>
+							<ChevronDown
+								size={10}
+								className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-text-tertiary"
+							/>
+						</div>
+					</div>
+				)}
 				<div className="flex items-end gap-1.5 rounded-md border border-border bg-surface-2 px-2 py-1.5">
 					<textarea
 						ref={inputRef}
