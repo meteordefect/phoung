@@ -260,10 +260,11 @@ export async function createRuntimeServer(deps: CreateRuntimeServerDependencies)
 					chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
 				}
 				const body = JSON.parse(Buffer.concat(chunks).toString("utf-8"));
-				const { message, conversation_id, model } = body as {
+				const { message, conversation_id, model, resume_session_path } = body as {
 					message?: string;
 					conversation_id?: string;
 					model?: string;
+					resume_session_path?: string;
 				};
 				if (!message) {
 					res.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
@@ -291,7 +292,7 @@ export async function createRuntimeServer(deps: CreateRuntimeServerDependencies)
 					res.write(`data: ${JSON.stringify(event)}\n\n`);
 				};
 				try {
-					await phoungChatStream(message, convId, boardOps, send, model);
+					await phoungChatStream(message, convId, boardOps, send, model, resume_session_path);
 					send({ type: "done", conversation_id: convId });
 				} catch (err) {
 					send({ type: "error", message: err instanceof Error ? err.message : String(err) });

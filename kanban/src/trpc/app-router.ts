@@ -679,6 +679,14 @@ export const runtimeAppRouter = t.router({
 			.query(async ({ ctx, input }) => {
 				return await ctx.phoungApi.getActiveTurn(input);
 			}),
+		listSessions: t.procedure.query(async ({ ctx }) => {
+			return await ctx.phoungApi.listSessions();
+		}),
+		loadSession: t.procedure
+			.input(z.object({ sessionId: z.string() }))
+			.query(async ({ ctx, input }) => {
+				return await ctx.phoungApi.loadSession(input);
+			}),
 	}),
 });
 

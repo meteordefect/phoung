@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { BoardOperations } from "../manager/phoung-tools.js";
 import { getAvailableModels, getSessionStats, getActiveTurn } from "../manager/phoung-session.js";
+import { listSessions, loadSession } from "../manager/session-history.js";
 import {
 	loadWorkspaceState,
 	saveWorkspaceState,
@@ -71,6 +72,14 @@ export function createPhoungApi() {
 
 		getActiveTurn: async (input: { conversationId: string }) => {
 			return getActiveTurn(input.conversationId);
+		},
+
+		listSessions: async () => {
+			return listSessions();
+		},
+
+		loadSession: async (input: { sessionId: string }) => {
+			return loadSession(input.sessionId);
 		},
 	};
 }

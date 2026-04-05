@@ -12,6 +12,7 @@ import { join, dirname } from "node:path";
 import { isMemoryConfigured, getMemoryDir } from "../memory/memory-service.js";
 import { assemblePhoungSystemPrompt, assemblePhoungContext } from "./phoung-context.js";
 import { createPhoungTools, type BoardOperations } from "./phoung-tools.js";
+import { scrubCredentials, scrubSessionFile } from "./credential-scrubber.js";
 
 export interface PhoungStreamEvent {
 	type: string;
@@ -43,6 +44,7 @@ function getSessionDir(): string {
 async function createPhoungSession(
 	conversationId: string,
 	boardOps: BoardOperations,
+	resumeSessionPath?: string,
 ): Promise<AgentSession> {
 	const systemPrompt = assemblePhoungSystemPrompt();
 	const contextText = assemblePhoungContext();
@@ -86,12 +88,16 @@ async function createPhoungSession(
 		model = available[0];
 	}
 
-	console.error(`[phoung] Creating session. model=${model ? `${model.provider}/${model.id}` : "none"}, cwd=${appDir}`);
+	const sessionManager = resumeSessionPath
+		? SessionManager.open(resumeSessionPath, sessionDir)
+		: SessionManager.create(cwd, sessionDir);
+
+	console.error(`[phoung] ${resumeSessionPath ? "Resuming" : "Creating"} session. model=${model ? `${model.provider}/${model.id}` : "none"}, cwd=${appDir}`);
 
 	const { session } = await createAgentSession({
 		cwd: appDir,
 		model,
-		sessionManager: SessionManager.create(cwd, sessionDir),
+		sessionManager,
 		authStorage,
 		modelRegistry,
 		resourceLoader: loader,
@@ -165,7 +171,7 @@ function mapSessionEvent(
 				type: "tool_update",
 				toolCallId: event.toolCallId,
 				name: event.toolName,
-				partialResult: formatToolResult(event.partialResult),
+				partialResult: scrubCredentials(formatToolResult(event.partialResult)),
 			});
 			break;
 		case "tool_execution_end":
@@ -173,7 +179,7 @@ function mapSessionEvent(
 				type: "tool_end",
 				toolCallId: event.toolCallId,
 				name: event.toolName,
-				result: formatToolResult(event.result),
+				result: scrubCredentials(formatToolResult(event.result)),
 				isError: event.isError,
 			});
 			break;
@@ -202,10 +208,11 @@ export async function phoungChatStream(
 	boardOps: BoardOperations,
 	onEvent: PhoungStreamCallback,
 	model?: string,
+	resumeSessionPath?: string,
 ): Promise<void> {
 	let session = activeSessions.get(conversationId);
 	if (!session) {
-		session = await createPhoungSession(conversationId, boardOps);
+		session = await createPhoungSession(conversationId, boardOps, resumeSessionPath);
 	}
 
 	if (model) {
@@ -235,6 +242,13 @@ export async function phoungChatStream(
 	} finally {
 		unsubscribe();
 		activeTurns.delete(conversationId);
+	}
+
+	const sessionFilePath = session.sessionFile;
+	if (sessionFilePath) {
+		scrubSessionFile(sessionFilePath).catch((err) => {
+			console.error("[phoung] Failed to scrub session file:", err);
+		});
 	}
 
 	if (!responseRef.text.trim()) {

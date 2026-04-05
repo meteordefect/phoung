@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Send, Loader2, Wrench, AlertCircle, ChevronDown } from "lucide-react";
+import { Send, Loader2, Wrench, AlertCircle, ChevronDown, History, Plus, ArrowLeft } from "lucide-react";
 import { cn } from "@/components/ui/cn";
 import { getSessionToken } from "@/auth/session-token-store";
 import { getRuntimeTrpcClient } from "@/runtime/trpc-client";
@@ -16,9 +16,28 @@ interface PhoungModel {
 	isDefault: boolean;
 }
 
+interface SessionListItem {
+	id: string;
+	path: string;
+	name?: string;
+	created: string;
+	modified: string;
+	messageCount: number;
+	preview: string;
+}
+
+interface LoadedSession {
+	id: string;
+	name?: string;
+	created: string;
+	messages: { role: "user" | "assistant"; content: string }[];
+}
+
 interface PhoungChatPanelProps {
 	workspaceId: string | null;
 }
+
+type ViewMode = "chat" | "history" | "viewing-session";
 
 export function PhoungChatPanel({ workspaceId }: PhoungChatPanelProps) {
 	const [messages, setMessages] = useState<PhoungMessage[]>([]);
@@ -30,6 +49,13 @@ export function PhoungChatPanel({ workspaceId }: PhoungChatPanelProps) {
 	const messagesEndRef = useRef<HTMLDivElement>(null);
 	const inputRef = useRef<HTMLTextAreaElement>(null);
 	const abortRef = useRef<AbortController | null>(null);
+
+	const [viewMode, setViewMode] = useState<ViewMode>("chat");
+	const [sessions, setSessions] = useState<SessionListItem[]>([]);
+	const [sessionsLoading, setSessionsLoading] = useState(false);
+	const [viewedSession, setViewedSession] = useState<LoadedSession | null>(null);
+	const [viewedSessionPath, setViewedSessionPath] = useState<string | null>(null);
+	const [sessionLoading, setSessionLoading] = useState(false);
 
 	useEffect(() => {
 		if (!workspaceId) return;
@@ -50,6 +76,54 @@ export function PhoungChatPanel({ workspaceId }: PhoungChatPanelProps) {
 		messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
 	}, [messages]);
 
+	const loadSessions = useCallback(async () => {
+		if (!workspaceId) return;
+		setSessionsLoading(true);
+		try {
+			const trpcClient = getRuntimeTrpcClient(workspaceId);
+			const result = await trpcClient.phoung.listSessions.query();
+			setSessions(result as SessionListItem[]);
+		} catch {
+			setSessions([]);
+		} finally {
+			setSessionsLoading(false);
+		}
+	}, [workspaceId]);
+
+	const openSession = useCallback(
+		async (sessionItem: SessionListItem) => {
+			if (!workspaceId) return;
+			setSessionLoading(true);
+			try {
+				const trpcClient = getRuntimeTrpcClient(workspaceId);
+				const result = await trpcClient.phoung.loadSession.query({ sessionId: sessionItem.id });
+				if (result) {
+					setViewedSession(result as LoadedSession);
+					setViewedSessionPath(sessionItem.path);
+					setViewMode("viewing-session");
+				}
+			} catch {
+				// Failed to load session
+			} finally {
+				setSessionLoading(false);
+			}
+		},
+		[workspaceId],
+	);
+
+	const resumeSession = useCallback(() => {
+		if (!viewedSession || !viewedSessionPath) return;
+		const resumeMessages: PhoungMessage[] = viewedSession.messages.map((m) => ({
+			role: m.role,
+			content: m.content,
+		}));
+		setMessages(resumeMessages);
+		const newConvId = `resume-${Date.now()}`;
+		setConversationId(newConvId);
+		setViewMode("chat");
+		setViewedSession(null);
+	}, [viewedSession, viewedSessionPath]);
+
 	const handleSend = useCallback(async () => {
 		const text = input.trim();
 		if (!text || isStreaming || !workspaceId) return;
@@ -69,18 +143,31 @@ export function PhoungChatPanel({ workspaceId }: PhoungChatPanelProps) {
 		const controller = new AbortController();
 		abortRef.current = controller;
 
+		const isResume = convId.startsWith("resume-") && viewedSessionPath;
 		try {
 			const token = await getSessionToken();
 			const headers: Record<string, string> = { "Content-Type": "application/json" };
 			if (token) {
 				headers["Authorization"] = `Bearer ${token}`;
 			}
+			const bodyObj: Record<string, unknown> = {
+				message: text,
+				conversation_id: convId,
+				model: selectedModel,
+			};
+			if (isResume) {
+				bodyObj.resume_session_path = viewedSessionPath;
+			}
 			const res = await fetch("/api/phoung/chat", {
 				method: "POST",
 				headers,
-				body: JSON.stringify({ message: text, conversation_id: convId, model: selectedModel }),
+				body: JSON.stringify(bodyObj),
 				signal: controller.signal,
 			});
+
+			if (isResume) {
+				setViewedSessionPath(null);
+			}
 
 			if (!res.ok || !res.body) {
 				setMessages((prev) => {
@@ -172,7 +259,7 @@ export function PhoungChatPanel({ workspaceId }: PhoungChatPanelProps) {
 			setIsStreaming(false);
 			abortRef.current = null;
 		}
-	}, [input, isStreaming, workspaceId, conversationId, selectedModel]);
+	}, [input, isStreaming, workspaceId, conversationId, selectedModel, viewedSessionPath]);
 
 	const handleKeyDown = useCallback(
 		(e: React.KeyboardEvent) => {
@@ -184,6 +271,19 @@ export function PhoungChatPanel({ workspaceId }: PhoungChatPanelProps) {
 		[handleSend],
 	);
 
+	const startNewChat = useCallback(() => {
+		setMessages([]);
+		setConversationId(null);
+		setViewedSession(null);
+		setViewedSessionPath(null);
+		setViewMode("chat");
+	}, []);
+
+	const showHistory = useCallback(() => {
+		setViewMode("history");
+		loadSessions();
+	}, [loadSessions]);
+
 	if (!workspaceId) {
 		return (
 			<div className="flex h-full items-center justify-center px-3 text-center text-sm text-text-secondary">
@@ -192,8 +292,118 @@ export function PhoungChatPanel({ workspaceId }: PhoungChatPanelProps) {
 		);
 	}
 
+	if (viewMode === "history") {
+		return (
+			<div className="flex h-full min-w-0 flex-col">
+				<div className="flex items-center gap-2 border-b border-border px-2 py-1.5">
+					<button
+						type="button"
+						onClick={() => setViewMode("chat")}
+						className="rounded p-1 text-text-secondary hover:text-text-primary hover:bg-surface-3 transition-colors cursor-pointer"
+					>
+						<ArrowLeft size={14} />
+					</button>
+					<span className="text-xs font-medium text-text-primary">Chat History</span>
+				</div>
+				<div className="flex-1 overflow-y-auto">
+					{sessionsLoading && (
+						<div className="flex items-center justify-center py-8">
+							<Loader2 size={16} className="animate-spin text-text-tertiary" />
+						</div>
+					)}
+					{!sessionsLoading && sessions.length === 0 && (
+						<div className="flex items-center justify-center py-8 text-xs text-text-tertiary">
+							No past sessions found.
+						</div>
+					)}
+					{!sessionsLoading &&
+						sessions.map((s) => (
+							<button
+								key={s.id}
+								type="button"
+								onClick={() => openSession(s)}
+								disabled={sessionLoading}
+								className="w-full text-left px-3 py-2.5 border-b border-border hover:bg-surface-2 transition-colors cursor-pointer disabled:opacity-50"
+							>
+								<div className="flex items-baseline justify-between gap-2 mb-0.5">
+									<span className="text-xs font-medium text-text-primary truncate">
+										{s.name || s.preview.slice(0, 60) || "Untitled"}
+									</span>
+									<span className="flex-shrink-0 text-[10px] text-text-tertiary">
+										{formatSessionDate(s.modified)}
+									</span>
+								</div>
+								<div className="text-[11px] text-text-secondary truncate">{s.preview}</div>
+								<div className="text-[10px] text-text-tertiary mt-0.5">
+									{s.messageCount} message{s.messageCount !== 1 ? "s" : ""}
+								</div>
+							</button>
+						))}
+				</div>
+			</div>
+		);
+	}
+
+	if (viewMode === "viewing-session" && viewedSession) {
+		return (
+			<div className="flex h-full min-w-0 flex-col">
+				<div className="flex items-center gap-2 border-b border-border px-2 py-1.5">
+					<button
+						type="button"
+						onClick={showHistory}
+						className="rounded p-1 text-text-secondary hover:text-text-primary hover:bg-surface-3 transition-colors cursor-pointer"
+					>
+						<ArrowLeft size={14} />
+					</button>
+					<div className="flex-1 min-w-0">
+						<span className="text-xs font-medium text-text-primary truncate block">
+							{viewedSession.name || "Past Session"}
+						</span>
+						<span className="text-[10px] text-text-tertiary">
+							{formatSessionDate(viewedSession.created)}
+						</span>
+					</div>
+					<button
+						type="button"
+						onClick={resumeSession}
+						className="rounded border border-accent/40 bg-accent/10 px-2 py-0.5 text-[11px] font-medium text-accent hover:bg-accent/20 transition-colors cursor-pointer"
+					>
+						Resume
+					</button>
+				</div>
+				<div className="flex-1 min-w-0 overflow-y-auto px-2 py-2 space-y-3">
+					{viewedSession.messages.map((msg, i) => (
+						<MessageBubble key={i} message={{ role: msg.role, content: msg.content }} />
+					))}
+				</div>
+			</div>
+		);
+	}
+
 	return (
 		<div className="flex h-full min-w-0 flex-col">
+			<div className="flex items-center justify-end gap-1 border-b border-border px-2 py-1">
+				{messages.length > 0 && (
+					<button
+						type="button"
+						onClick={startNewChat}
+						disabled={isStreaming}
+						className="rounded p-1 text-text-tertiary hover:text-text-primary hover:bg-surface-3 transition-colors cursor-pointer disabled:opacity-40"
+						title="New chat"
+					>
+						<Plus size={14} />
+					</button>
+				)}
+				<button
+					type="button"
+					onClick={showHistory}
+					disabled={isStreaming}
+					className="rounded p-1 text-text-tertiary hover:text-text-primary hover:bg-surface-3 transition-colors cursor-pointer disabled:opacity-40"
+					title="Chat history"
+				>
+					<History size={14} />
+				</button>
+			</div>
 			<div className="flex-1 min-w-0 overflow-y-auto px-2 py-2 space-y-3">
 				{messages.length === 0 && (
 					<div className="flex h-full items-center justify-center text-center text-xs text-text-tertiary px-4">
@@ -257,6 +467,26 @@ export function PhoungChatPanel({ workspaceId }: PhoungChatPanelProps) {
 			</div>
 		</div>
 	);
+}
+
+function formatSessionDate(dateStr: string): string {
+	try {
+		const date = new Date(dateStr);
+		const now = new Date();
+		const diffMs = now.getTime() - date.getTime();
+		const diffMins = Math.floor(diffMs / 60000);
+		const diffHours = Math.floor(diffMs / 3600000);
+		const diffDays = Math.floor(diffMs / 86400000);
+
+		if (diffMins < 1) return "just now";
+		if (diffMins < 60) return `${diffMins}m ago`;
+		if (diffHours < 24) return `${diffHours}h ago`;
+		if (diffDays < 7) return `${diffDays}d ago`;
+
+		return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+	} catch {
+		return "";
+	}
 }
 
 function MessageBubble({ message }: { message: PhoungMessage }) {
