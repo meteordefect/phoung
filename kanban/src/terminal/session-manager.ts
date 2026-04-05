@@ -618,6 +618,9 @@ export class TerminalSessionManager implements TerminalSessionService {
 		if (entry.active || !isActiveState(entry.summary.state)) {
 			return cloneSummary(entry.summary);
 		}
+		if (entry.summary.state === "awaiting_review") {
+			return cloneSummary(entry.summary);
+		}
 
 		const summary = updateSummary(entry, {
 			state: "idle",

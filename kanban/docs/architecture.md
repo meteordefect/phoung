@@ -374,6 +374,57 @@ Some of the highest-value rules are enforced automatically by lint.
 
 These rules are intentionally narrow. They exist to protect the seams that are easiest to accidentally erode.
 
+## Updating From Upstream
+
+This fork is intended to keep absorbing useful fixes from upstream Kanban, `pi`, and the published Cline SDK packages. The architecture is deliberately split so those updates remain practical instead of turning into a rewrite.
+
+### Why updates are still manageable
+
+The most important reason is that the fork-specific behavior is concentrated in a small number of integration seams instead of being spread through the whole runtime:
+
+- `src/core/agent-catalog.ts`
+- `src/terminal/agent-session-adapters.ts`
+- `src/server/runtime-state-hub.ts`
+- `web-ui/src/terminal/persistent-terminal-manager.ts`
+- `src/cline-sdk/`
+
+When upstream changes land, those are the files to inspect first. In most cases the right strategy is to take upstream behavior first, then re-apply Phoung- or `pi`-specific integration only where the fork still needs it.
+
+### Kanban upstream strategy
+
+For upstream `cline/kanban` changes:
+
+1. Fetch upstream and diff before merging broadly.
+2. Review the integration seam files above first.
+3. Prefer extending upstream flows instead of replacing them with fork-only logic.
+4. Re-run tests and verify task start, review-ready transitions, terminal behavior, and sidebar behavior.
+
+The architecture should keep making this possible. If fork-specific logic starts spreading into unrelated runtime or UI files, upstream adoption gets harder immediately.
+
+### pi update strategy
+
+`pi` is integrated through the PTY runtime plus `agent-session-adapters.ts`, while the actual agent behavior comes from the published `@mariozechner/pi-coding-agent` package. That means most `pi` updates should be handled like this:
+
+1. Update the package first.
+2. Re-check `agent-session-adapters.ts` for CLI flag, extension API, auth, or session-model changes.
+3. Verify task launch, completion, review transitions, and resume behavior.
+
+The key rule is to keep `pi` behavior inside the adapter layer instead of baking `pi` assumptions directly into generic runtime code.
+
+### Cline update strategy
+
+Cline is already isolated behind the `src/cline-sdk/` integration layer and the SDK boundary modules. That is what keeps SDK updates realistic:
+
+1. Update the published `@clinebot/*` packages first.
+2. Diff `src/cline-sdk/` against the new SDK contract.
+3. Keep direct SDK handling inside the existing boundary modules instead of leaking new SDK-specific logic outward.
+
+If Cline updates require touching unrelated runtime or browser files, that is usually a sign that an architectural boundary is being bypassed.
+
+### Architecture maintenance rule
+
+The best way to preserve future updateability is simple: isolate fork logic at the seams, keep ownership clear, and avoid scattering custom agent behavior through unrelated parts of the app. This is not just a repo-maintenance preference; it is part of the architecture.
+
 ## Deliberate Tradeoffs
 
 Not everything is perfectly generalized, and that is okay. Some current tradeoffs are intentional.

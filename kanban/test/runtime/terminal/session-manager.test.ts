@@ -85,6 +85,26 @@ describe("TerminalSessionManager", () => {
 		expect(recovered?.reviewReason).toBeNull();
 	});
 
+	it("preserves awaiting-review sessions without active processes", () => {
+		const manager = new TerminalSessionManager();
+		manager.hydrateFromRecord({
+			"task-1": createSummary({
+				state: "awaiting_review",
+				agentId: "pi",
+				workspacePath: "/tmp/worktree",
+				reviewReason: "exit",
+				pid: null,
+			}),
+		});
+
+		const recovered = manager.recoverStaleSession("task-1");
+
+		expect(recovered?.state).toBe("awaiting_review");
+		expect(recovered?.agentId).toBe("pi");
+		expect(recovered?.workspacePath).toBe("/tmp/worktree");
+		expect(recovered?.reviewReason).toBe("exit");
+	});
+
 	it("tracks only the latest two turn checkpoints", () => {
 		const manager = new TerminalSessionManager();
 		manager.hydrateFromRecord({
