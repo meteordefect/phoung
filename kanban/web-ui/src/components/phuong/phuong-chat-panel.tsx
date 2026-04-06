@@ -50,6 +50,22 @@ export function PhuongChatPanel({ workspaceId }: PhuongChatPanelProps) {
 	const inputRef = useRef<HTMLTextAreaElement>(null);
 	const abortRef = useRef<AbortController | null>(null);
 
+	const PHUONG_TEXTAREA_MAX_HEIGHT = 120;
+
+	const autoResizeTextarea = useCallback(() => {
+		const textarea = inputRef.current;
+		if (!textarea) {
+			return;
+		}
+		textarea.style.height = "auto";
+		textarea.style.height = `${Math.min(textarea.scrollHeight, PHUONG_TEXTAREA_MAX_HEIGHT)}px`;
+		textarea.style.overflowY = textarea.scrollHeight > PHUONG_TEXTAREA_MAX_HEIGHT ? "auto" : "hidden";
+	}, []);
+
+	useEffect(() => {
+		autoResizeTextarea();
+	}, [autoResizeTextarea, input]);
+
 	const [viewMode, setViewMode] = useState<ViewMode>("chat");
 	const [sessions, setSessions] = useState<SessionListItem[]>([]);
 	const [sessionsLoading, setSessionsLoading] = useState(false);
@@ -448,7 +464,7 @@ export function PhuongChatPanel({ workspaceId }: PhuongChatPanelProps) {
 						rows={1}
 						disabled={isStreaming}
 						className="flex-1 resize-none bg-transparent text-sm text-text-primary placeholder:text-text-tertiary outline-none disabled:opacity-50"
-						style={{ maxHeight: 120 }}
+						style={{ maxHeight: PHUONG_TEXTAREA_MAX_HEIGHT, overflowY: "hidden" }}
 					/>
 					<button
 						type="button"

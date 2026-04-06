@@ -1,3 +1,4 @@
+import { UserButton } from "@clerk/react";
 import * as RadixPopover from "@radix-ui/react-popover";
 import {
 	ArrowDown,
@@ -607,15 +608,24 @@ export function TopBar({
 						className="ml-0.5 mr-0.5"
 					/>
 				) : null}
-				<Button
-					variant="ghost"
-					size="sm"
-					icon={<Settings size={16} />}
-					onClick={() => onOpenSettings?.()}
-					aria-label="Settings"
-					data-testid="open-settings-button"
-					className="ml-0.5 mr-0.5"
+			<Button
+				variant="ghost"
+				size="sm"
+				icon={<Settings size={16} />}
+				onClick={() => onOpenSettings?.()}
+				aria-label="Settings"
+				data-testid="open-settings-button"
+				className="ml-0.5 mr-0.5"
+			/>
+			{import.meta.env.VITE_CLERK_PUBLISHABLE_KEY && (
+				<UserButton
+					appearance={{
+						elements: {
+							avatarBox: "w-7 h-7",
+						},
+					}}
 				/>
+			)}
 			</div>
 			</nav>
 			<Dialog
