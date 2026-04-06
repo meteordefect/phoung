@@ -13,6 +13,11 @@ import { isMemoryConfigured, getMemoryDir } from "../memory/memory-service.js";
 import { assemblePhoungSystemPrompt, assemblePhoungContext } from "./phoung-context.js";
 import { createPhoungTools, type BoardOperations } from "./phoung-tools.js";
 import { scrubCredentials, scrubSessionFile } from "./credential-scrubber.js";
+import {
+	normalizeModelKey,
+	resolveModelByInput,
+	selectPreferredPhoungModel,
+} from "./phoung-model-selection.js";
 
 export interface PhoungStreamEvent {
 	type: string;
@@ -76,17 +81,8 @@ async function createPhoungSession(
 
 	const customTools = createPhoungTools(boardOps);
 	const modelRegistry = ModelRegistry.create(authStorage);
-
-	const defaultModelEnv = process.env.DEFAULT_MODEL || "";
-	let model;
-	if (defaultModelEnv.includes("/")) {
-		const [provider, ...rest] = defaultModelEnv.split("/");
-		model = modelRegistry.find(provider!, rest.join("/"));
-	}
-	if (!model) {
-		const available = modelRegistry.getAvailable();
-		model = available[0];
-	}
+	const availableModels = modelRegistry.getAvailable();
+	const model = selectPreferredPhoungModel(availableModels, process.env.DEFAULT_MODEL || "") ?? undefined;
 
 	const sessionManager = resumeSessionPath
 		? SessionManager.open(resumeSessionPath, sessionDir)
@@ -218,10 +214,7 @@ export async function phoungChatStream(
 	if (model) {
 		const registry = ModelRegistry.create(setupAuth());
 		const available = registry.getAvailable();
-		const match = available.find(
-			(m: { id: string; provider: string }) =>
-				m.id === model || m.id.includes(model) || `${m.provider}/${m.id}` === model,
-		);
+		const match = resolveModelByInput(available, model);
 		if (match) {
 			await session.setModel(match);
 		}
@@ -277,11 +270,15 @@ export function getAvailableModels(): { id: string; label: string; isDefault: bo
 	const modelRegistry = ModelRegistry.create(authStorage);
 	const available = modelRegistry.getAvailable();
 	const defaultModel = process.env.DEFAULT_MODEL || "";
+	const preferredModel = selectPreferredPhoungModel(available, defaultModel);
+	const preferredModelKey = preferredModel ? normalizeModelKey(preferredModel) : "";
 
-	return available.map((m: { id: string; provider: string }) => ({
+	return available.map((m) => ({
 		id: `${m.provider}/${m.id}`,
 		label: `${m.provider}/${m.id}`,
-		isDefault: m.id === defaultModel || `${m.provider}/${m.id}` === defaultModel,
+		isDefault:
+			(m.id === defaultModel || `${m.provider}/${m.id}` === defaultModel) ||
+			(preferredModelKey.length > 0 && normalizeModelKey(m) === preferredModelKey),
 	}));
 }
 
