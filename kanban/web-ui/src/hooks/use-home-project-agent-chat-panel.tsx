@@ -30,6 +30,7 @@ interface UseHomeProjectAgentChatPanelInput {
 	latestTaskChatMessage: RuntimeStateStreamTaskChatMessage | null;
 	taskChatMessagesByTaskId: Record<string, RuntimeTaskChatMessage[]>;
 	onSessionSummary: (summary: RuntimeTaskSessionSummary) => void;
+	onCreateNewChat: () => void;
 }
 
 export function useHomeProjectAgentChatPanel({
@@ -43,6 +44,7 @@ export function useHomeProjectAgentChatPanel({
 	latestTaskChatMessage,
 	taskChatMessagesByTaskId,
 	onSessionSummary,
+	onCreateNewChat,
 }: UseHomeProjectAgentChatPanelInput): ReactElement | null {
 	const { sendTaskChatMessage, loadTaskChatMessages, cancelTaskChatTurn } = useClineChatRuntimeActions({
 		currentProjectId,
@@ -107,9 +109,15 @@ export function useHomeProjectAgentChatPanel({
 
 		if (!selectedTaskId) {
 			return (
-				<div className="flex flex-1 min-h-0 flex-col items-center justify-center gap-2 bg-surface-0 px-6 text-center">
-					<p className="text-sm text-text-secondary">No agent chats yet for this project.</p>
-					<p className="text-xs text-text-tertiary">Create a task on the board, then open it here from the sidebar.</p>
+				<div className="flex flex-1 min-h-0 flex-col items-center justify-center gap-3 bg-surface-0 px-6 text-center">
+					<p className="text-sm text-text-secondary">No chat selected.</p>
+					<button
+						type="button"
+						onClick={onCreateNewChat}
+						className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:opacity-90 transition-opacity cursor-pointer"
+					>
+						New Chat
+					</button>
 				</div>
 			);
 		}
@@ -166,6 +174,7 @@ export function useHomeProjectAgentChatPanel({
 		hasNoProjects,
 		isClineAgent,
 		latestTaskChatMessage,
+		onCreateNewChat,
 		onSessionSummary,
 		runtimeProjectConfig,
 		selectedAgentLabel,

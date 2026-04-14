@@ -43,6 +43,7 @@ export function ProjectNavigationPanel({
 	selectedTaskId,
 	onSelectProject,
 	onSelectAgentChat,
+	onCreateNewChat,
 	onRemoveProject,
 	onAddProject,
 }: {
@@ -58,6 +59,7 @@ export function ProjectNavigationPanel({
 	selectedTaskId: string | null;
 	onSelectProject: (projectId: string) => void;
 	onSelectAgentChat: (projectId: string, taskId: string) => void;
+	onCreateNewChat: () => void;
 	onRemoveProject: (projectId: string) => Promise<boolean>;
 	onAddProject: () => void;
 }): React.ReactElement {
@@ -258,6 +260,7 @@ export function ProjectNavigationPanel({
 							selectedTaskId={currentProjectId === project.id ? selectedTaskId : null}
 							onSelect={onSelectProject}
 							onSelectAgentChat={onSelectAgentChat}
+							onCreateNewChat={onCreateNewChat}
 								onRemove={(projectId) => {
 									const found = sortedProjects.find((item) => item.id === projectId);
 									if (!found) {
@@ -472,6 +475,7 @@ function ProjectRow({
 	selectedTaskId,
 	onSelect,
 	onSelectAgentChat,
+	onCreateNewChat,
 	onRemove,
 }: {
 	project: RuntimeProjectSummary;
@@ -480,6 +484,7 @@ function ProjectRow({
 	chats: ProjectAgentChatItem[];
 	selectedTaskId: string | null;
 	onSelect: (id: string) => void;
+	onCreateNewChat: () => void;
 	onSelectAgentChat: (projectId: string, taskId: string) => void;
 	onRemove: (id: string) => void;
 }): React.ReactElement {
@@ -608,41 +613,56 @@ function ProjectRow({
 				</DropdownMenu.Root>
 				</div>
 			</div>
-			{isCurrent && chats.length > 0 ? (
+			{isCurrent ? (
 				<div className="mt-1.5 ml-0.5 flex flex-col gap-0.5 border-l border-white/30 pl-2">
 					<button
 						type="button"
 						onClick={(e) => {
 							e.stopPropagation();
-							setIsChatsExpanded((prev) => !prev);
+							onCreateNewChat();
 						}}
-						className="flex w-full cursor-pointer items-center gap-1 rounded-sm px-1.5 py-1 text-left text-[10px] text-white/50 hover:text-white/80"
+						className="flex w-full cursor-pointer items-center gap-1.5 rounded-sm px-1.5 py-1 text-left text-xs text-white/70 hover:bg-white/10 hover:text-white"
 					>
-						{isChatsExpanded ? <ChevronDown size={10} className="shrink-0" /> : <ChevronRight size={10} className="shrink-0" />}
-						<span>Chats ({chats.length})</span>
+						<Plus size={12} className="shrink-0 opacity-80" />
+						<span className="min-w-0 truncate">New Chat</span>
 					</button>
-					{isChatsExpanded ? chats.map((chat) => {
-						const isChatSelected = selectedTaskId === chat.id;
-						return (
+					{chats.length > 0 ? (
+						<>
 							<button
-								key={chat.id}
 								type="button"
 								onClick={(e) => {
 									e.stopPropagation();
-									onSelectAgentChat(project.id, chat.id);
+									setIsChatsExpanded((prev) => !prev);
 								}}
-								className={cn(
-									"flex w-full cursor-pointer items-center gap-1.5 rounded-sm px-1.5 py-1 text-left text-xs",
-									isChatSelected
-										? "bg-white/20 text-white"
-										: "text-white/70 hover:bg-white/10 hover:text-white",
-								)}
+								className="flex w-full cursor-pointer items-center gap-1 rounded-sm px-1.5 py-1 text-left text-[10px] text-white/50 hover:text-white/80"
 							>
-								<MessageSquare size={12} className="shrink-0 opacity-80" />
-								<span className="min-w-0 truncate">{chat.title}</span>
+								{isChatsExpanded ? <ChevronDown size={10} className="shrink-0" /> : <ChevronRight size={10} className="shrink-0" />}
+								<span>Chats ({chats.length})</span>
 							</button>
-						);
-					}) : null}
+							{isChatsExpanded ? chats.map((chat) => {
+								const isChatSelected = selectedTaskId === chat.id;
+								return (
+									<button
+										key={chat.id}
+										type="button"
+										onClick={(e) => {
+											e.stopPropagation();
+											onSelectAgentChat(project.id, chat.id);
+										}}
+										className={cn(
+											"flex w-full cursor-pointer items-center gap-1.5 rounded-sm px-1.5 py-1 text-left text-xs",
+											isChatSelected
+												? "bg-white/20 text-white"
+												: "text-white/70 hover:bg-white/10 hover:text-white",
+										)}
+									>
+										<MessageSquare size={12} className="shrink-0 opacity-80" />
+										<span className="min-w-0 truncate">{chat.title}</span>
+									</button>
+								);
+							}) : null}
+						</>
+					) : null}
 				</div>
 			) : null}
 		</div>

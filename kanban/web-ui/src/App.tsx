@@ -64,7 +64,7 @@ import { useRuntimeProjectConfig } from "@/runtime/use-runtime-project-config";
 import { useTerminalConnectionReady } from "@/runtime/use-terminal-connection-ready";
 import { useWorkspacePersistence } from "@/runtime/use-workspace-persistence";
 import { saveWorkspaceState } from "@/runtime/workspace-state-query";
-import { findCardSelection } from "@/state/board-state";
+import { addTaskToColumnWithResult, findCardSelection } from "@/state/board-state";
 import {
 	getTaskWorkspaceInfo,
 	getTaskWorkspaceSnapshot,
@@ -421,6 +421,17 @@ export default function App(): ReactElement {
 		terminalBackgroundColor: TERMINAL_THEME_COLORS.surfacePrimary,
 	});
 	const homeTerminalSummary = sessions[homeTerminalTaskId] ?? null;
+
+	const handleCreateNewChat = useCallback(() => {
+		const baseRef = defaultTaskBranchRef ?? "main";
+		const created = addTaskToColumnWithResult(board, "backlog", {
+			prompt: "New chat",
+			baseRef,
+		});
+		setBoard(created.board);
+		setSelectedTaskId(created.task.id);
+	}, [board, defaultTaskBranchRef, setBoard]);
+
 	const homeProjectAgentChatPanel = useHomeProjectAgentChatPanel({
 		currentProjectId,
 		hasNoProjects,
@@ -432,6 +443,7 @@ export default function App(): ReactElement {
 		latestTaskChatMessage,
 		taskChatMessagesByTaskId,
 		onSessionSummary: upsertSession,
+		onCreateNewChat: handleCreateNewChat,
 	});
 	const { runningShortcutLabel, handleSelectShortcutLabel, handleRunShortcut, handleCreateShortcut } = useShortcutActions({
 		currentProjectId,
@@ -749,6 +761,7 @@ export default function App(): ReactElement {
 						void handleSelectProject(projectId);
 					}}
 					onSelectAgentChat={handleSelectAgentChatFromSidebar}
+					onCreateNewChat={handleCreateNewChat}
 					onRemoveProject={handleRemoveProject}
 					onAddProject={() => {
 						void handleAddProject();
