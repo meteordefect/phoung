@@ -1,6 +1,6 @@
 import * as Collapsible from "@radix-ui/react-collapsible";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { ChevronDown, ChevronUp, Ellipsis, LayoutGrid, Maximize2, MessageSquare, Minimize2, Plus } from "lucide-react";
+import { ChevronDown, ChevronRight, ChevronUp, Ellipsis, Maximize2, MessageSquare, Minimize2, Plus } from "lucide-react";
 import { type MouseEvent as ReactMouseEvent, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ClineIcon } from "@/components/ui/cline-icon";
@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { Kbd } from "@/components/ui/kbd";
 import { Spinner } from "@/components/ui/spinner";
-import type { HomeMainView, ProjectAgentChatItem } from "@/hooks/use-project-agent-chats";
+import type { ProjectAgentChatItem } from "@/hooks/use-project-agent-chats";
 import type { RuntimeProjectSummary } from "@/runtime/types";
 import { formatPathForDisplay } from "@/utils/path-display";
 import { isMacPlatform, modifierKeyLabel } from "@/utils/platform";
@@ -41,9 +41,7 @@ export function ProjectNavigationPanel({
 	agentSectionContent,
 	chatsByProject,
 	selectedTaskId,
-	homeMainView,
 	onSelectProject,
-	onOpenBoard,
 	onSelectAgentChat,
 	onRemoveProject,
 	onAddProject,
@@ -58,9 +56,7 @@ export function ProjectNavigationPanel({
 	agentSectionContent?: ReactNode;
 	chatsByProject: Record<string, ProjectAgentChatItem[]>;
 	selectedTaskId: string | null;
-	homeMainView: HomeMainView;
 	onSelectProject: (projectId: string) => void;
-	onOpenBoard: (projectId: string) => void;
 	onSelectAgentChat: (projectId: string, taskId: string) => void;
 	onRemoveProject: (projectId: string) => Promise<boolean>;
 	onAddProject: () => void;
@@ -225,8 +221,7 @@ export function ProjectNavigationPanel({
 				{activeSection === "agent" ? (
 					<div className="flex items-start gap-2" style={{ padding: "8px 4px 0" }}>
 						<p className="flex-1 text-text-tertiary text-xs">
-							Orchestrate across projects: plan work, route to agent chats, and use the board when you
-							need columns. Phuong can read project memory when configured.
+							Orchestrate across projects: plan work, route to agent chats. Phuong can read project memory when configured.
 						</p>
 						<Button
 							variant="ghost"
@@ -256,15 +251,13 @@ export function ProjectNavigationPanel({
 						{sortedProjects.map((project) => (
 							<ProjectRow
 								key={project.id}
-								project={project}
-								isCurrent={currentProjectId === project.id}
-								removingProjectId={removingProjectId}
-								chats={chatsByProject[project.id] ?? []}
-								selectedTaskId={currentProjectId === project.id ? selectedTaskId : null}
-								isBoardView={currentProjectId === project.id && homeMainView === "board"}
-								onSelect={onSelectProject}
-								onOpenBoard={onOpenBoard}
-								onSelectAgentChat={onSelectAgentChat}
+							project={project}
+							isCurrent={currentProjectId === project.id}
+							removingProjectId={removingProjectId}
+							chats={chatsByProject[project.id] ?? []}
+							selectedTaskId={currentProjectId === project.id ? selectedTaskId : null}
+							onSelect={onSelectProject}
+							onSelectAgentChat={onSelectAgentChat}
 								onRemove={(projectId) => {
 									const found = sortedProjects.find((item) => item.id === projectId);
 									if (!found) {
@@ -477,9 +470,7 @@ function ProjectRow({
 	removingProjectId,
 	chats,
 	selectedTaskId,
-	isBoardView,
 	onSelect,
-	onOpenBoard,
 	onSelectAgentChat,
 	onRemove,
 }: {
@@ -488,9 +479,7 @@ function ProjectRow({
 	removingProjectId: string | null;
 	chats: ProjectAgentChatItem[];
 	selectedTaskId: string | null;
-	isBoardView: boolean;
 	onSelect: (id: string) => void;
-	onOpenBoard: (projectId: string) => void;
 	onSelectAgentChat: (projectId: string, taskId: string) => void;
 	onRemove: (id: string) => void;
 }): React.ReactElement {
@@ -498,6 +487,7 @@ function ProjectRow({
 	const isRemovingProject = removingProjectId === project.id;
 	const hasAnyProjectRemoval = removingProjectId !== null;
 	const [isMenuOpen, setIsMenuOpen] = useState(false);
+	const [isChatsExpanded, setIsChatsExpanded] = useState(true);
 	const taskCountBadges: TaskCountBadge[] = [
 		{
 			id: "backlog",
@@ -618,24 +608,21 @@ function ProjectRow({
 				</DropdownMenu.Root>
 				</div>
 			</div>
-			{isCurrent ? (
-				<div className="mt-1.5 ml-0.5 flex flex-col gap-0.5 border-l border-border pl-2">
+			{isCurrent && chats.length > 0 ? (
+				<div className="mt-1.5 ml-0.5 flex flex-col gap-0.5 border-l border-white/30 pl-2">
 					<button
 						type="button"
 						onClick={(e) => {
 							e.stopPropagation();
-							onOpenBoard(project.id);
+							setIsChatsExpanded((prev) => !prev);
 						}}
-						className={cn(
-							"flex w-full cursor-pointer items-center gap-1.5 rounded-sm px-1.5 py-1 text-left text-xs",
-							isBoardView ? "bg-surface-4 text-text-primary" : "text-text-secondary hover:bg-surface-3 hover:text-text-primary",
-						)}
+						className="flex w-full cursor-pointer items-center gap-1 rounded-sm px-1.5 py-1 text-left text-[10px] text-white/50 hover:text-white/80"
 					>
-						<LayoutGrid size={12} className="shrink-0 opacity-80" />
-						<span className="min-w-0 truncate">Board</span>
+						{isChatsExpanded ? <ChevronDown size={10} className="shrink-0" /> : <ChevronRight size={10} className="shrink-0" />}
+						<span>Chats ({chats.length})</span>
 					</button>
-					{chats.map((chat) => {
-						const isChatSelected = !isBoardView && selectedTaskId === chat.id;
+					{isChatsExpanded ? chats.map((chat) => {
+						const isChatSelected = selectedTaskId === chat.id;
 						return (
 							<button
 								key={chat.id}
@@ -647,15 +634,15 @@ function ProjectRow({
 								className={cn(
 									"flex w-full cursor-pointer items-center gap-1.5 rounded-sm px-1.5 py-1 text-left text-xs",
 									isChatSelected
-										? "bg-surface-4 text-text-primary"
-										: "text-text-secondary hover:bg-surface-3 hover:text-text-primary",
+										? "bg-white/20 text-white"
+										: "text-white/70 hover:bg-white/10 hover:text-white",
 								)}
 							>
 								<MessageSquare size={12} className="shrink-0 opacity-80" />
 								<span className="min-w-0 truncate">{chat.title}</span>
 							</button>
 						);
-					})}
+					}) : null}
 				</div>
 			) : null}
 		</div>

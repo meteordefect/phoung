@@ -2,11 +2,13 @@
 import type { ReactElement } from "react";
 import { useCallback, useMemo } from "react";
 
+import { AgentTerminalPanel } from "@/components/detail-panels/agent-terminal-panel";
 import { ClineAgentChatPanel } from "@/components/detail-panels/cline-agent-chat-panel";
 import { Spinner } from "@/components/ui/spinner";
 import { createIdleTaskSession } from "@/hooks/app-utils";
 import { useClineChatRuntimeActions } from "@/hooks/use-cline-chat-runtime-actions";
 import { isNativeClineAgentSelected, selectLatestTaskChatMessageForTask } from "@/runtime/native-agent";
+import { isRuntimeAgentLaunchSupported } from "@runtime-agent-catalog";
 import type {
 	RuntimeConfigResponse,
 	RuntimeStateStreamTaskChatMessage,
@@ -14,6 +16,7 @@ import type {
 	RuntimeTaskSessionSummary,
 } from "@/runtime/types";
 import { findCardSelection } from "@/state/board-state";
+import { TERMINAL_THEME_COLORS } from "@/terminal/theme-colors";
 import type { BoardData } from "@/types";
 
 interface UseHomeProjectAgentChatPanelInput {
@@ -79,6 +82,8 @@ export function useHomeProjectAgentChatPanel({
 		return findCardSelection(board, selectedTaskId);
 	}, [board, selectedTaskId]);
 
+	const isClineAgent = isNativeClineAgentSelected(runtimeProjectConfig?.selectedAgentId);
+
 	const panel = useMemo(() => {
 		if (hasNoProjects || !currentProjectId) {
 			return null;
@@ -92,7 +97,7 @@ export function useHomeProjectAgentChatPanel({
 			);
 		}
 
-		if (!isNativeClineAgentSelected(runtimeProjectConfig.selectedAgentId)) {
+		if (!isRuntimeAgentLaunchSupported(runtimeProjectConfig.selectedAgentId)) {
 			return (
 				<div className="flex flex-1 min-h-0 items-center justify-center bg-surface-0 px-6 text-center text-sm text-text-secondary">
 					No runnable {selectedAgentLabel} command is configured. Open Settings, install the CLI, and select it.
@@ -110,37 +115,58 @@ export function useHomeProjectAgentChatPanel({
 		}
 
 		const summary = taskSessions[selectedTaskId] ?? createIdleTaskSession(selectedTaskId);
-		const taskMessages = taskChatMessagesByTaskId[selectedTaskId] ?? [];
-		const latestForTask = selectLatestTaskChatMessageForTask(selectedTaskId, latestTaskChatMessage);
+
+		if (isClineAgent) {
+			const taskMessages = taskChatMessagesByTaskId[selectedTaskId] ?? [];
+			const latestForTask = selectLatestTaskChatMessageForTask(selectedTaskId, latestTaskChatMessage);
+
+			return (
+				<ClineAgentChatPanel
+					key={`${selectedTaskId}-${clineSessionContextVersion}`}
+					taskId={selectedTaskId}
+					summary={summary}
+					taskColumnId={selection?.column.id}
+					defaultMode="act"
+					showComposerModeToggle
+					workspaceId={currentProjectId}
+					runtimeConfig={runtimeProjectConfig}
+					onSendMessage={handleSend}
+					onCancelTurn={handleCancel}
+					onLoadMessages={handleLoad}
+					incomingMessage={latestForTask}
+					incomingMessages={taskMessages}
+					showRightBorder={false}
+					composerPlaceholder="Message this agent…"
+				/>
+			);
+		}
 
 		return (
-			<ClineAgentChatPanel
-				key={`${selectedTaskId}-${clineSessionContextVersion}`}
+			<AgentTerminalPanel
+				key={selectedTaskId}
 				taskId={selectedTaskId}
-				summary={summary}
-				taskColumnId={selection?.column.id}
-				defaultMode="act"
-				showComposerModeToggle
 				workspaceId={currentProjectId}
-				runtimeConfig={runtimeProjectConfig}
-				onSendMessage={handleSend}
-				onCancelTurn={handleCancel}
-				onLoadMessages={handleLoad}
-				incomingMessage={latestForTask}
-				incomingMessages={taskMessages}
+				terminalEnabled
+				summary={summary}
+				onSummary={onSessionSummary}
+				showSessionToolbar={false}
+				autoFocus
 				showRightBorder={false}
-				composerPlaceholder="Message this Pi agent…"
+				panelBackgroundColor={TERMINAL_THEME_COLORS.surfacePrimary}
+				terminalBackgroundColor={TERMINAL_THEME_COLORS.surfacePrimary}
+				taskColumnId={selection?.column.id}
 			/>
 		);
 	}, [
-		cancelTaskChatTurn,
 		clineSessionContextVersion,
 		currentProjectId,
 		handleCancel,
 		handleLoad,
 		handleSend,
 		hasNoProjects,
+		isClineAgent,
 		latestTaskChatMessage,
+		onSessionSummary,
 		runtimeProjectConfig,
 		selectedAgentLabel,
 		selectedTaskId,

@@ -6,12 +6,10 @@ import type { ReactElement } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { notifyError, showAppToast } from "@/components/app-toaster";
-import { CardDetailView } from "@/components/card-detail-view";
 import { ClearTrashDialog } from "@/components/clear-trash-dialog";
 import { DebugDialog } from "@/components/debug-dialog";
 import { AgentTerminalPanel } from "@/components/detail-panels/agent-terminal-panel";
 import { GitHistoryView } from "@/components/git-history-view";
-import { KanbanBoard } from "@/components/kanban-board";
 import { ProjectNavigationPanel } from "@/components/project-navigation-panel";
 import { ResizableBottomPane } from "@/components/resizable-bottom-pane";
 import { RuntimeSettingsDialog, type RuntimeSettingsSection } from "@/components/runtime-settings-dialog";
@@ -60,8 +58,6 @@ import { useWorkspaceSync } from "@/hooks/use-workspace-sync";
 import {
 	getTaskAgentNavbarHint,
 	isTaskAgentSetupSatisfied,
-	selectLatestTaskChatMessageForTask,
-	selectTaskChatMessagesForTask,
 } from "@/runtime/native-agent";
 import type { RuntimeTaskSessionSummary } from "@/runtime/types";
 import { useRuntimeProjectConfig } from "@/runtime/use-runtime-project-config";
@@ -202,43 +198,13 @@ export default function App(): ReactElement {
 		setSessions,
 	});
 
-	const selectedCard = useMemo(() => {
-		if (!selectedTaskId) {
-			return null;
-		}
-		return findCardSelection(board, selectedTaskId);
-	}, [board, selectedTaskId]);
-
-	const { chatsByProject, homeMainView, setHomeMainView } = useProjectAgentChats({
+	const { chatsByProject } = useProjectAgentChats({
 		currentProjectId,
 		board,
 	});
 
-	const firstBoardTaskId = useMemo(() => {
-		for (const column of board.columns) {
-			const first = column.cards[0];
-			if (first) {
-				return first.id;
-			}
-		}
-		return null;
-	}, [board]);
-
-	useEffect(() => {
-		if (selectedCard) {
-			return;
-		}
-		if (homeMainView !== "chats") {
-			return;
-		}
-		if (selectedTaskId !== null) {
-			return;
-		}
-		if (!firstBoardTaskId) {
-			return;
-		}
-		setSelectedTaskId(firstBoardTaskId);
-	}, [firstBoardTaskId, homeMainView, selectedCard, selectedTaskId]);
+	const selectedCard = null;
+	const boardSelection = null;
 
 	const {
 		workspacePath,
@@ -460,7 +426,7 @@ export default function App(): ReactElement {
 		hasNoProjects,
 		runtimeProjectConfig,
 		board,
-		selectedTaskId: !selectedCard && homeMainView === "chats" ? selectedTaskId : null,
+		selectedTaskId,
 		taskSessions: sessions,
 		clineSessionContextVersion,
 		latestTaskChatMessage,
@@ -556,10 +522,13 @@ export default function App(): ReactElement {
 	]);
 
 	useEffect(() => {
-		if (selectedTaskId && !selectedCard) {
+		if (!selectedTaskId) {
+			return;
+		}
+		if (!findCardSelection(board, selectedTaskId)) {
 			setSelectedTaskId(null);
 		}
-	}, [selectedTaskId, selectedCard]);
+	}, [board, selectedTaskId]);
 
 	useEffect(() => {
 		if (selectedCard) {
@@ -583,26 +552,14 @@ export default function App(): ReactElement {
 		setIsGitHistoryOpen(false);
 	}, []);
 
-	const handleOpenBoardFromSidebar = useCallback(
-		(projectId: string) => {
-			if (navigationCurrentProjectId !== projectId) {
-				void handleSelectProject(projectId);
-			}
-			setHomeMainView("board");
-			setSelectedTaskId(null);
-		},
-		[handleSelectProject, navigationCurrentProjectId, setHomeMainView],
-	);
-
 	const handleSelectAgentChatFromSidebar = useCallback(
 		(projectId: string, taskId: string) => {
 			if (navigationCurrentProjectId !== projectId) {
 				void handleSelectProject(projectId);
 			}
-			setHomeMainView("chats");
 			setSelectedTaskId(taskId);
 		},
-		[handleSelectProject, navigationCurrentProjectId, setHomeMainView],
+		[handleSelectProject, navigationCurrentProjectId],
 	);
 
 	const handleOpenSettings = useCallback((section?: RuntimeSettingsSection) => {
@@ -705,20 +662,7 @@ export default function App(): ReactElement {
 		setPendingTaskStartAfterEditId(null);
 	}, [board, handleStartTaskFromBoard, pendingTaskStartAfterEditId]);
 
-	const detailSession = selectedCard
-		? (sessions[selectedCard.card.id] ?? createIdleTaskSession(selectedCard.card.id))
-		: null;
 	const detailTerminalSummary = detailTerminalTaskId ? (sessions[detailTerminalTaskId] ?? null) : null;
-	const detailTerminalSubtitle = useMemo(() => {
-		if (!selectedCard) {
-			return null;
-		}
-		return (
-			getTaskWorkspaceInfo(selectedCard.card.id, selectedCard.card.baseRef)?.path ??
-			getTaskWorkspaceSnapshot(selectedCard.card.id)?.path ??
-			null
-		);
-	}, [selectedCard]);
 
 	const runtimeHint = useMemo(() => {
 		return getTaskAgentNavbarHint(runtimeProjectConfig, {
@@ -726,34 +670,14 @@ export default function App(): ReactElement {
 		});
 	}, [runtimeProjectConfig, shouldUseNavigationPath]);
 
-	const activeWorkspacePath = selectedCard
-		? (getTaskWorkspaceInfo(selectedCard.card.id, selectedCard.card.baseRef)?.path ??
-			getTaskWorkspaceSnapshot(selectedCard.card.id)?.path ??
-			workspacePath ??
-			undefined)
-		: shouldUseNavigationPath
-			? (navigationProjectPath ?? undefined)
-			: (workspacePath ?? undefined);
-
-	const activeWorkspaceHint = useMemo(() => {
-		if (!selectedCard) {
-			return undefined;
-		}
-		const activeSelectedTaskWorkspaceInfo = getTaskWorkspaceInfo(selectedCard.card.id, selectedCard.card.baseRef);
-		if (!activeSelectedTaskWorkspaceInfo) {
-			return undefined;
-		}
-		if (!activeSelectedTaskWorkspaceInfo.exists) {
-			return selectedCard.column.id === "trash" ? "Task worktree deleted" : "Task worktree not created yet";
-		}
-		return undefined;
-	}, [selectedCard]);
+	const activeWorkspacePath = shouldUseNavigationPath
+		? (navigationProjectPath ?? undefined)
+		: (workspacePath ?? undefined);
 
 	const navbarWorkspacePath = hasNoProjects ? undefined : activeWorkspacePath;
-	const navbarWorkspaceHint = hasNoProjects ? undefined : activeWorkspaceHint;
 	const navbarRuntimeHint = hasNoProjects ? undefined : runtimeHint;
 	const shouldHideProjectDependentTopBarActions =
-		!selectedCard && (isProjectSwitching || isAwaitingWorkspaceSnapshot || isWorkspaceMetadataPending);
+		isProjectSwitching || isAwaitingWorkspaceSnapshot || isWorkspaceMetadataPending;
 
 	const {
 		openTargetOptions,
@@ -766,11 +690,6 @@ export default function App(): ReactElement {
 		currentProjectId,
 		workspacePath: activeWorkspacePath,
 	});
-	const selectedTaskChatMessages = selectTaskChatMessagesForTask(selectedCard?.card.id, taskChatMessagesByTaskId);
-	const latestSelectedTaskChatMessage = selectLatestTaskChatMessageForTask(
-		selectedCard?.card.id,
-		latestTaskChatMessage,
-	);
 	const handleCreateDialogOpenChange = useCallback(
 		(open: boolean) => {
 			if (!open) {
@@ -814,7 +733,7 @@ export default function App(): ReactElement {
 
 	return (
 		<div className="flex h-[100svh] min-w-0 overflow-hidden">
-			{!selectedCard ? (
+			{(
 				<ProjectNavigationPanel
 					projects={displayedProjects}
 					isLoadingProjects={isProjectListLoading}
@@ -826,55 +745,33 @@ export default function App(): ReactElement {
 					agentSectionContent={<PhuongChatPanel workspaceId={currentProjectId} />}
 					chatsByProject={chatsByProject}
 					selectedTaskId={selectedTaskId}
-					homeMainView={homeMainView}
 					onSelectProject={(projectId) => {
 						void handleSelectProject(projectId);
 					}}
-					onOpenBoard={handleOpenBoardFromSidebar}
 					onSelectAgentChat={handleSelectAgentChatFromSidebar}
 					onRemoveProject={handleRemoveProject}
 					onAddProject={() => {
 						void handleAddProject();
 					}}
 				/>
-			) : null}
+			)}
 			<div className="flex flex-col flex-1 min-w-0 overflow-hidden">
 				<TopBar
-					onBack={selectedCard ? handleBack : undefined}
+					onBack={selectedTaskId ? handleBack : undefined}
 					workspacePath={navbarWorkspacePath}
 					isWorkspacePathLoading={shouldShowProjectLoadingState}
-					workspaceHint={navbarWorkspaceHint}
+					workspaceHint={undefined}
 					runtimeHint={navbarRuntimeHint}
-					selectedTaskId={selectedCard?.card.id ?? null}
-					selectedTaskBaseRef={selectedCard?.card.baseRef ?? null}
-					showHomeGitSummary={!hasNoProjects && !selectedCard}
-					runningGitAction={selectedCard || hasNoProjects ? null : runningGitAction}
-					onGitFetch={
-						selectedCard
-							? undefined
-							: () => {
-									void runGitAction("fetch");
-								}
-					}
-					onGitPull={
-						selectedCard
-							? undefined
-							: () => {
-									void runGitAction("pull");
-								}
-					}
-					onGitPush={
-						selectedCard
-							? undefined
-							: () => {
-									void runGitAction("push");
-								}
-					}
-					onToggleTerminal={
-						hasNoProjects ? undefined : selectedCard ? handleToggleDetailTerminal : handleToggleHomeTerminal
-					}
-					isTerminalOpen={selectedCard ? isDetailTerminalOpen : showHomeBottomTerminal}
-					isTerminalLoading={selectedCard ? isDetailTerminalStarting : isHomeTerminalStarting}
+					selectedTaskId={null}
+					selectedTaskBaseRef={null}
+					showHomeGitSummary={!hasNoProjects}
+					runningGitAction={hasNoProjects ? null : runningGitAction}
+					onGitFetch={() => { void runGitAction("fetch"); }}
+					onGitPull={() => { void runGitAction("pull"); }}
+					onGitPush={() => { void runGitAction("push"); }}
+					onToggleTerminal={hasNoProjects ? undefined : handleToggleHomeTerminal}
+					isTerminalOpen={showHomeBottomTerminal}
+					isTerminalLoading={isHomeTerminalStarting}
 					onOpenSettings={handleOpenSettings}
 					showDebugButton={debugModeEnabled}
 					onOpenDebugDialog={debugModeEnabled ? handleOpenDebugDialog : undefined}
@@ -895,11 +792,7 @@ export default function App(): ReactElement {
 					hideProjectDependentActions={shouldHideProjectDependentTopBarActions}
 				/>
 				<div className="relative flex flex-1 min-h-0 min-w-0 overflow-hidden">
-					<div
-						className="kb-home-layout"
-						aria-hidden={selectedCard ? true : undefined}
-						style={selectedCard ? { visibility: "hidden" } : undefined}
-					>
+					<div className="kb-home-layout">
 						{shouldShowProjectLoadingState ? (
 							<div className="flex flex-1 min-h-0 items-center justify-center bg-surface-0">
 								<Spinner size={30} />
@@ -937,39 +830,10 @@ export default function App(): ReactElement {
 											}}
 											isDiscardWorkingChangesPending={isDiscardingHomeWorkingChanges}
 										/>
-									) : homeMainView === "chats" ? (
+									) : (
 										<div className="flex flex-1 min-h-0 min-w-0 flex-col overflow-hidden">
 											{homeProjectAgentChatPanel}
 										</div>
-									) : (
-										<KanbanBoard
-											data={board}
-											taskSessions={sessions}
-											workspacePath={workspacePath}
-											onCardSelect={handleCardSelect}
-											onCreateTask={handleOpenCreateTask}
-											onStartTask={handleStartTaskFromBoard}
-											onStartAllTasks={handleStartAllBacklogTasksFromBoard}
-											onClearTrash={handleOpenClearTrash}
-											editingTaskId={editingTaskId}
-											inlineTaskEditor={inlineTaskEditor}
-											onEditTask={handleOpenEditTask}
-											onCommitTask={handleCommitTask}
-											onOpenPrTask={handleOpenPrTask}
-											onCancelAutomaticTaskAction={handleCancelAutomaticTaskAction}
-											commitTaskLoadingById={commitTaskLoadingById}
-											openPrTaskLoadingById={openPrTaskLoadingById}
-											moveToTrashLoadingById={moveToTrashLoadingById}
-											onMoveToTrashTask={handleMoveReviewCardToTrash}
-											onRestoreFromTrashTask={handleRestoreTaskFromTrash}
-											dependencies={board.dependencies}
-											onCreateDependency={handleCreateDependency}
-											onDeleteDependency={handleDeleteDependency}
-											onRequestProgrammaticCardMoveReady={
-												selectedCard ? undefined : handleProgrammaticCardMoveReady
-											}
-											onDragEnd={handleDragEnd}
-										/>
 									)}
 								</div>
 								{showHomeBottomTerminal ? (
@@ -1014,76 +878,6 @@ export default function App(): ReactElement {
 							</div>
 						)}
 					</div>
-					{selectedCard && detailSession ? (
-						<div className="absolute inset-0 flex min-h-0 min-w-0">
-							<CardDetailView
-								selection={selectedCard}
-								currentProjectId={currentProjectId}
-								workspacePath={workspacePath}
-								selectedAgentId={runtimeProjectConfig?.selectedAgentId ?? null}
-								runtimeConfig={runtimeProjectConfig ?? null}
-								sessionSummary={detailSession}
-								taskSessions={sessions}
-								onSessionSummary={upsertSession}
-								onCardSelect={handleCardSelect}
-								onTaskDragEnd={handleDetailTaskDragEnd}
-								onCreateTask={handleOpenCreateTask}
-								onStartTask={handleStartTaskFromBoard}
-								onStartAllTasks={handleStartAllBacklogTasksFromBoard}
-								onClearTrash={handleOpenClearTrash}
-								editingTaskId={editingTaskId}
-								inlineTaskEditor={inlineTaskEditor}
-								onEditTask={(task) => {
-									handleOpenEditTask(task, { preserveDetailSelection: true });
-								}}
-								onCommitTask={handleCommitTask}
-								onOpenPrTask={handleOpenPrTask}
-								onAgentCommitTask={handleAgentCommitTask}
-								onAgentOpenPrTask={handleAgentOpenPrTask}
-								commitTaskLoadingById={commitTaskLoadingById}
-								openPrTaskLoadingById={openPrTaskLoadingById}
-								agentCommitTaskLoadingById={agentCommitTaskLoadingById}
-								agentOpenPrTaskLoadingById={agentOpenPrTaskLoadingById}
-								moveToTrashLoadingById={moveToTrashLoadingById}
-								onMoveReviewCardToTrash={handleMoveReviewCardToTrash}
-								onRestoreTaskFromTrash={handleRestoreTaskFromTrash}
-								onCancelAutomaticTaskAction={handleCancelAutomaticTaskAction}
-								onAddReviewComments={(taskId: string, text: string) => {
-									void handleAddReviewComments(taskId, text);
-								}}
-								onSendReviewComments={(taskId: string, text: string) => {
-									void handleSendReviewComments(taskId, text);
-								}}
-								onSendClineChatMessage={sendTaskChatMessage}
-								onCancelClineChatTurn={cancelTaskChatTurn}
-								onLoadClineChatMessages={fetchTaskChatMessages}
-								latestClineChatMessage={latestSelectedTaskChatMessage}
-								streamedClineChatMessages={selectedTaskChatMessages}
-								onMoveToTrash={handleMoveToTrash}
-								isMoveToTrashLoading={moveToTrashLoadingById[selectedCard.card.id] ?? false}
-								gitHistoryPanel={
-									isGitHistoryOpen ? (
-										<GitHistoryView workspaceId={currentProjectId} gitHistory={gitHistory} />
-									) : undefined
-								}
-								onCloseGitHistory={handleCloseGitHistory}
-								bottomTerminalOpen={isDetailTerminalOpen}
-								bottomTerminalTaskId={detailTerminalTaskId}
-								bottomTerminalSummary={detailTerminalSummary}
-								bottomTerminalSubtitle={detailTerminalSubtitle}
-								onBottomTerminalClose={closeDetailTerminal}
-								bottomTerminalPaneHeight={detailTerminalPaneHeight}
-								onBottomTerminalPaneHeightChange={setDetailTerminalPaneHeight}
-								onBottomTerminalConnectionReady={markTerminalConnectionReady}
-								bottomTerminalAgentCommand={agentCommand}
-								onBottomTerminalSendAgentCommand={handleSendAgentCommandToDetailTerminal}
-								isBottomTerminalExpanded={isDetailTerminalExpanded}
-								onBottomTerminalToggleExpand={handleToggleExpandDetailTerminal}
-								isDocumentVisible={isDocumentVisible}
-								onClineSettingsSaved={refreshRuntimeProjectConfig}
-							/>
-						</div>
-					) : null}
 				</div>
 			</div>
 			<RuntimeSettingsDialog

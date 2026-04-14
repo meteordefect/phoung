@@ -111,7 +111,7 @@ function mergeChatsWithBoard(board: BoardData, existing: ProjectAgentChatItem[])
 	return next;
 }
 
-export type HomeMainView = "chats" | "board";
+export type HomeMainView = "chats";
 
 interface UseProjectAgentChatsInput {
 	currentProjectId: string | null;
