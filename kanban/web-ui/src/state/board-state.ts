@@ -261,9 +261,6 @@ export function addTaskToColumnWithResult(
 	draft: TaskDraft,
 ): { board: BoardData; task: BoardCard } {
 	const prompt = draft.prompt.trim();
-	if (!prompt) {
-		throw new Error("Task prompt is required.");
-	}
 	const result = runtimeTaskState.addTaskToColumn(
 		board,
 		columnId,

@@ -264,9 +264,6 @@ export function addTaskToColumn(
 	now: number = Date.now(),
 ): RuntimeCreateTaskResult {
 	const prompt = input.prompt.trim();
-	if (!prompt) {
-		throw new Error("Task prompt is required.");
-	}
 	const baseRef = input.baseRef.trim();
 	if (!baseRef) {
 		throw new Error("Task baseRef is required.");

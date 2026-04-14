@@ -426,7 +426,7 @@ export default function App(): ReactElement {
 	const handleCreateNewChat = useCallback(() => {
 		const baseRef = defaultTaskBranchRef ?? "main";
 		const created = addTaskToColumnWithResult(board, "backlog", {
-			prompt: "New chat",
+			prompt: "",
 			baseRef,
 		});
 		setBoard(created.board);
