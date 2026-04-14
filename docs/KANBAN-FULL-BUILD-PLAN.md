@@ -45,17 +45,19 @@ This system is not just "Kanban with a chat box". It is a hosted manager-and-wor
 ### User experience
 
 - You log into a secure web UI on the VPS.
-- The main surface is your forked Kanban board.
-- A manager panel lets you chat with `Phuong`.
-- `Phuong` can create, prioritize, link, and start tasks on the board.
-- When a task runs, Kanban creates an isolated worktree and launches `pi`.
-- `pi` works the task using `GLM-5`.
-- Review, diffs, comments, commits, and PR actions happen through the Kanban UI.
+- The left sidebar shows all your projects. Each project expands to reveal its agent chat sessions.
+- Clicking a project or "+ New Chat" creates a new Pi agent chat in that project's context.
+- Clicking an existing chat opens it in the center panel — a full terminal session with the Pi agent.
+- Multiple chats run concurrently, each in its own worktree and PTY process.
+- Phuong is available as a sidebar orchestration agent — it can plan work, read project memory, and route to agent chats.
 - When meaningful task events happen, the relevant project memory is updated in the external memory repo.
+
+> **Design decision:** The kanban board UI has been removed. The board data model still exists internally (each chat is a task on the internal board), but the user never sees columns, cards, or drag-and-drop. The interface is purely projects and chats, similar to Cursor's layout.
 
 ### Platform definition
 
-- imported `Kanban` code is the execution substrate and operator UI.
+- imported `Kanban` code is the execution substrate and runtime engine.
+- The UI is a projects-and-chats interface, not a kanban board.
 - `Phuong` is the planning and orchestration layer.
 - `Memory repos` are the durable knowledge layer.
 - `pi` is the default worker runtime.
@@ -683,12 +685,14 @@ Outcome:
 - memory service owns reads/writes
 - backups and git sync jobs are live
 
-## Phase 6: Add Phuong manager service
+## Phase 6: Add Phuong manager service ✅ (in progress)
 
 Outcome:
 
-- `Phuong` chat exists inside the hosted product
-- `Phuong` can create and manipulate board tasks
+- `Phuong` chat exists inside the hosted product as a sidebar agent panel
+- The kanban board UI has been removed — replaced with a projects-and-chats layout
+- Each project shows its agent chat sessions in the sidebar; clicking creates or opens a Pi chat
+- `Phuong` can read project memory and orchestrate across projects
 
 ## Phase 7: Connect memory to task lifecycle
 
@@ -753,8 +757,8 @@ Build in this order (revised to match actual execution):
 3. ✅ add Clerk auth (Tailscale step dropped — going straight to public Clerk-gated access)
 4. ✅ deploy to VPS with public HTTPS + Clerk (systemd, nginx, TLS, pi, UFW)
 5. ✅ externalize memory service and backup jobs
-6. add `Phuong` manager service and chat surface ← **next**
-7. connect memory to task lifecycle
+6. ✅ (in progress) add Phuong manager + rebuild UI as projects-and-chats layout
+7. connect memory to task lifecycle ← **next**
 8. production hardening (systemd, Ansible, backups, monitoring)
 
 ## Definition of Done
@@ -778,4 +782,4 @@ The migration is complete when all of the following are true:
 
 The technical implementation plan is `docs/BUILD-RUNSHEET.md`. It contains step-by-step execution instructions for each phase.
 
-Current status: Phases 1–5 complete. The system is live at `beta.friendlabs.ai` with Clerk auth, pi task execution (ZAI/GLM), full deploy automation, and external memory service. Next action is Phase 6 — adding the Phuong manager service and chat surface.
+Current status: Phases 1–5 complete. Phase 6 is in progress. The system is live at `beta.friendlabs.ai` with Clerk auth, pi task execution (ZAI/GLM), full deploy automation, and external memory service. The UI has been rebuilt from a kanban board into a projects-and-chats layout. Phuong is integrated as a sidebar orchestration agent. The board data model is retained internally but the board UI is removed. Next actions are completing Phuong's tool integration (creating chats from Phuong, memory write-back) and Phase 7 (memory-to-task-lifecycle).

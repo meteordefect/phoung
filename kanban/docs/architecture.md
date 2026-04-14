@@ -16,6 +16,8 @@ If you remember nothing else, remember this:
 - Cline is session-oriented
 - the backend coordinates both through one runtime API and one state stream
 
+> **Phuong fork note:** In this fork, the kanban board UI has been removed. The user interface is a projects-and-chats layout: projects in the left sidebar, each with expandable chat sessions, and the active chat in the center panel. The board data model still exists internally (each chat is a task on the board's backlog), but the board, card detail view, and drag-and-drop are no longer rendered. `HomeMainView` is locked to `"chats"`.
+
 ## System Diagram
 
 ```text
@@ -98,14 +100,14 @@ websocket stream
 browser runtime state hooks
     |
     v
-board, detail view, sidebar, and terminal panels
+project sidebar, agent chat panels, and terminal surfaces
 ```
 
 ## The Mental Model
 
 Kanban is easiest to understand if you separate it into three layers of responsibility.
 
-The browser layer is the presentation and orchestration layer. It renders the board, detail view, settings, and terminal or chat surfaces. It also owns short-lived UI state such as panel visibility, form drafts, and optimistic message rendering.
+The browser layer is the presentation and orchestration layer. It renders the project sidebar, agent chat panels, settings, and terminal surfaces. It also owns short-lived UI state such as panel visibility, form drafts, and optimistic message rendering.
 
 The runtime layer is the control layer. It decides what session to start, where it should run, what worktree or workspace it belongs to, what command or SDK session should be used, and what state should be streamed back to the browser.
 
@@ -156,12 +158,12 @@ These terms come up everywhere in the codebase.
 
 | Concept | Meaning | Why it matters |
 | --- | --- | --- |
-| Workspace | an indexed git repository that Kanban has opened | most browser and runtime state is scoped to a workspace |
-| Task card | a board item with a prompt, base ref, and review settings | a task is the unit of work the board cares about |
+| Project | an indexed git repository that Kanban has opened | most browser and runtime state is scoped to a project |
+| Chat / Task | a board item with a prompt, base ref, and review settings; displayed as a chat session in the sidebar | a chat is the unit of work — each gets its own worktree and agent process |
 | Worktree | a per-task git worktree | most task agents run inside one |
-| Task session | the live runtime attached to a task card | this may be a PTY process or a native Cline session |
-| Home agent session | a synthetic, project-scoped session used by the sidebar agent surface | this lets the sidebar reuse existing runtime primitives without creating a real task card |
-| Runtime summary | the small state object the board uses to know whether a session is idle, running, awaiting review, interrupted, or failed | this is the bridge between long-running agent work and the UI |
+| Task session | the live runtime attached to a chat/task | this may be a PTY process or a native Cline session |
+| Phuong sidebar | the project-scoped orchestration agent surface | used for planning, memory access, and cross-project coordination |
+| Runtime summary | the small state object the UI uses to know whether a session is idle, running, awaiting review, interrupted, or failed | this is the bridge between long-running agent work and the UI |
 
 ## Who Owns What
 
@@ -230,9 +232,15 @@ This is important because Kanban is not designed around browser polling. The run
 
 The frontend is also easier to navigate if you think in responsibilities instead of folders.
 
-`App.tsx` is the composition root. It wires together the major hooks, determines which high-level surfaces are visible, and hands state down into the board, detail view, dialogs, and terminal areas. It should not become a second runtime orchestrator.
+`App.tsx` is the composition root. It wires together the major hooks and renders the two-panel layout: `ProjectNavigationPanel` (left sidebar) and the active agent chat panel (center). There is no board view or card detail view — those have been removed. `App.tsx` should not become a second runtime orchestrator.
 
-Hooks in `web-ui/src/hooks/` are where most domain logic lives. This includes project navigation, workspace synchronization, task-session actions, review behavior, Cline chat state, and the home sidebar agent lifecycle. If you are looking for "how does this behavior actually work?", the answer is usually in a hook, not a component.
+The main UI surfaces are:
+
+- **`ProjectNavigationPanel`** — left sidebar showing projects with expandable chat lists and a "+ New Chat" button per project
+- **`useHomeProjectAgentChatPanel`** — hook that renders the center panel: either an `AgentTerminalPanel` (for Pi and other CLI agents) or a `ClineAgentChatPanel` (for native Cline), plus empty state with "New Chat" button
+- **`PhuongChatPanel`** — sidebar agent for cross-project orchestration, accessible via a tab toggle in the sidebar
+
+Hooks in `web-ui/src/hooks/` are where most domain logic lives. This includes project navigation, workspace synchronization, task-session actions, chat state management (`use-project-agent-chats.ts`), and the agent chat panel lifecycle. If you are looking for "how does this behavior actually work?", the answer is usually in a hook, not a component.
 
 Components in `web-ui/src/components/` are mostly rendering and composition. Good frontend changes often mean moving runtime-aware logic into hooks and leaving the component to render a view model.
 
@@ -311,9 +319,9 @@ One very important rule falls out of that table:
 
 Do not put Cline provider secrets or OAuth tokens back into `runtime-config.ts`.
 
-## The Home Sidebar Agent Surface
+## The Phuong Sidebar Agent Surface
 
-The home sidebar agent surface is one of the less obvious parts of the architecture.
+The Phuong sidebar panel is a project-scoped orchestration agent surface. It is accessible via a tab toggle in the left sidebar panel, alongside the project list.
 
 It looks like a task panel, but it is not backed by a real task card and it does not create a task worktree. Instead, the system creates a synthetic home agent session id and runs a project-scoped session behind that identity.
 
@@ -323,13 +331,21 @@ It lets the sidebar reuse the same runtime primitives that already exist for tas
 
 The current behavior is:
 
-- when the selected sidebar agent is Cline, the sidebar renders native chat
-- when the selected sidebar agent is another provider, the sidebar renders a terminal panel
+- Phuong is rendered as a `PhuongChatPanel` in the sidebar's agent section
 - the home session is keyed to the current workspace and relevant agent descriptor
-- switching between Projects and Agent in the sidebar should not restart the session
+- switching between Projects and Agent tabs in the sidebar should not restart the session
 - switching to a different project or materially different agent configuration should rotate the session
 
-This is one of the places where the architecture still has a little intentional weirdness. It is not a first-class workspace-native session type yet, but it is now documented and contained.
+## The Agent Chat Panel
+
+The main content area shows the active agent chat for the selected project and task. This is managed by the `useHomeProjectAgentChatPanel` hook, which:
+
+- renders `AgentTerminalPanel` for CLI-backed agents (Pi, Claude Code, Codex, etc.)
+- renders `ClineAgentChatPanel` for the native Cline agent
+- shows a "New Chat" button when no chat is selected
+- each chat is backed by a board task internally; `handleCreateNewChat` creates a task via `addTaskToColumnWithResult` and selects it
+
+Multiple chats run concurrently. On the server, each task has its own `PtySession` (a real process) managed by `TerminalSessionManager`. On the client, each task has its own `PersistentTerminal` instance — when switching chats, the terminal is unmounted from the DOM but its WebSocket connection stays alive, preserving output history.
 
 ## Main Flows
 
@@ -429,7 +445,8 @@ The best way to preserve future updateability is simple: isolate fork logic at t
 
 Not everything is perfectly generalized, and that is okay. Some current tradeoffs are intentional.
 
-- the home sidebar uses a synthetic session identity instead of a first-class workspace-native session type
+- the Phuong sidebar uses a synthetic session identity instead of a first-class workspace-native session type
+- the board data model is retained internally even though the board UI is removed — this is intentional because the runtime, worktree lifecycle, and state streaming are all built around board tasks
 - some agent-selection code still branches on `"cline"` directly, even though the long-term direction is more capability-based routing
 - the published SDK packages are still a real dependency boundary, so the local boundary modules matter a lot
 - Cline is native chat while the rest of the catalog is still command-driven, which means some parallel abstractions are similar but not identical
@@ -445,8 +462,10 @@ When you are making a change, this table is often more useful than a file list.
 | task startup for Claude Code, Codex, Gemini, OpenCode, or Droid | the PTY runtime and agent launch path | accidentally adding special logic to the Cline path |
 | Cline provider settings, models, or OAuth | the Cline provider service and SDK provider boundary | storing secrets in Kanban config or duplicating OAuth policy |
 | Cline message rendering or send/cancel behavior | the shared Cline hooks and task-session service | making detail view and sidebar behave differently |
-| live board updates | the runtime state hub and browser stream consumers | falling back to polling or duplicating summary logic |
-| home sidebar agent behavior | the synthetic home session lifecycle | treating the sidebar like a normal task with a real worktree |
+| live chat/session updates | the runtime state hub and browser stream consumers | falling back to polling or duplicating summary logic |
+| Phuong sidebar agent behavior | the synthetic home session lifecycle | treating the sidebar like a normal task with a real worktree |
+| new chat creation | `handleCreateNewChat` in App.tsx and the board state model | bypassing the board data model for task creation |
+| project sidebar navigation | `ProjectNavigationPanel` and `use-project-agent-chats.ts` | duplicating chat list state or breaking the collapsible toggle |
 | new architectural boundaries | the existing lint rules and ownership model | adding a rule that is too broad and becomes a nuisance |
 
 ## What A New Engineer Should Expect
@@ -455,7 +474,8 @@ A new engineer opening this repo will probably notice a few things quickly:
 
 - the backend is long-lived and stateful, not a thin stateless API server
 - the browser is closer to a local control client than a traditional web app
-- the task system, review system, and runtime system are tightly connected
+- the UI is a projects-and-chats layout, not a kanban board — but the board data model still exists internally
+- each chat is a task on the internal board, but the user never sees columns or cards
 - Cline has a richer integration path than the rest of the agent catalog
 - the architecture now favors clean ownership over compatibility glue because this area did not have legacy users to preserve
 

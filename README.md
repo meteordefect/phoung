@@ -1,19 +1,41 @@
 # Phuong
 
-A hosted AI project manager built on a [Kanban](https://github.com/cline/kanban) fork. You chat with Phuong through a secure web dashboard. Phuong plans work, creates tasks on a visual board, and launches `pi` coding agents in isolated worktrees on your VPS. Project memory lives in a separate git-backed repository.
+A hosted AI project manager built on a [Kanban](https://github.com/cline/kanban) fork. You chat with Phuong through a secure web dashboard. Phuong plans work, routes to agent chats, and manages project memory. Each project has multiple concurrent `pi` agent chat sessions that run independently on your VPS. Project memory lives in a separate git-backed repository.
 
 ## Status
 
-Rebuilding. See `docs/BUILD-RUNSHEET.md` for the step-by-step execution plan.
+Live at `beta.friendlabs.ai`. Phases 1–5 complete, Phase 6 (Phuong manager service) in progress. See `docs/BUILD-RUNSHEET.md` for execution details.
+
+## UI Layout
+
+The interface follows a projects-and-chats model (similar to Cursor's layout):
+
+- **Left sidebar** — lists all projects; each project expands to show its agent chat sessions and a "+ New Chat" button
+- **Center panel** — the active agent chat (Pi terminal or Cline SDK chat, depending on the configured agent)
+- **Phuong panel** — sidebar agent chat for cross-project orchestration, planning, and memory access
+
+There is no kanban board. The board columns still exist internally as the backing data model for chat sessions (each chat is a "task" on the board), but the board UI has been removed. The user interacts entirely through projects and chats.
 
 ## Architecture
 
-- **Kanban fork** — task board, worktree lifecycle, agent runtime, review/diff UI
+- **Kanban fork** — runtime engine, worktree lifecycle, agent sessions, git operations, tRPC API
 - **Phuong** — manager agent (chat, planning, task decomposition, memory retrieval)
 - **pi** — worker agent (executes coding tasks in worktrees using GLM-5 via ZAI)
 - **Memory** — external git repo (`base-control`), never in this repo
 - **Auth** — Clerk with server-side JWT verification
 - **Deploy** — VPS with nginx, TLS, systemd, Ansible
+
+### How agent chats work
+
+Each chat session is backed by a board task internally. When you click "+ New Chat" or send a message:
+
+1. A task card is created on the internal backlog
+2. The Kanban runtime creates an ephemeral git worktree for the task
+3. Pi launches as a CLI process in the worktree
+4. The terminal session streams output back to the browser via WebSocket
+5. Multiple chats run concurrently — each has its own PTY process and worktree
+
+Sessions persist independently. Switching between chats unmounts the terminal from the DOM but keeps the WebSocket connection and process alive.
 
 ## Docs
 
@@ -23,7 +45,8 @@ Rebuilding. See `docs/BUILD-RUNSHEET.md` for the step-by-step execution plan.
 | `docs/KANBAN-FULL-BUILD-PLAN.md` | Full architectural plan and decisions |
 | `docs/CLINE-KANBAN-ADOPTION-REPORT.md` | Evaluation of cline/kanban as the base |
 | `docs/MEMORY-SEPARATION.md` | External memory repo design |
-| `docs/ARCHITECTURE.md` | Previous architecture (reference) |
+| `docs/ARCHITECTURE.md` | v1 architecture (historical reference) |
+| `kanban/docs/architecture.md` | Kanban runtime and frontend architecture |
 
 ## Updating Upstream
 
@@ -41,7 +64,7 @@ When upstream `cline/kanban` ships useful fixes:
    - `kanban/src/server/runtime-state-hub.ts`
    - `kanban/web-ui/src/terminal/persistent-terminal-manager.ts`
 4. Prefer taking upstream behavior first, then re-applying Phuong- and `pi`-specific logic only where still needed.
-5. Re-run the Kanban tests and manually verify task start, review-ready transitions, terminal behavior, and sidebar chat behavior.
+5. Re-run the Kanban tests and manually verify task start, terminal behavior, and sidebar chat behavior.
 
 ### pi and Cline updates
 

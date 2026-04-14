@@ -1,4 +1,6 @@
-# Phuong — Architecture
+# Phuong — Architecture (v1 — Historical Reference)
+
+> **This document describes the original v1 Phuong architecture** (Express API, React review UI, Docker/gVisor subagents). The v1 stack is archived in `archive/v1/`. The current system is built on a Kanban fork with a projects-and-chats UI, Pi worker agents running directly in worktrees on the VPS, and Clerk auth. See the root `README.md` and `kanban/docs/architecture.md` for the current architecture.
 
 ## Overview
 

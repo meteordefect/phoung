@@ -282,71 +282,48 @@ External memory repo is live, readable by the app, auto-backed-up. Commit.
 
 ---
 
-## Phase 6: Add Phuong manager service
+## Phase 6: Add Phuong manager service and rebuild UI ✅ (in progress)
 
-### 6.1 Create Phuong service module
+### Design change: projects-and-chats, no board
 
-File: `kanban/src/manager/` (new directory)
+The kanban board UI has been removed. The user interface now follows a projects-and-chats model:
 
-Port from `archive/v1/main-agent/src/phuong.ts`:
+- **Left sidebar** — lists projects; each expands to show its chat sessions and a "+ New Chat" button
+- **Center panel** — the active agent chat (Pi terminal or Cline SDK chat)
+- **Phuong sidebar** — an orchestration agent chat panel for planning and memory access
 
-- `phuong-session.ts` — pi-coding-agent SDK session, streaming, model selection
-- `phuong-tools.ts` — custom tools (create task on board, update task, load memory, create memory)
-- `phuong-context.ts` — selective context assembly (system prompt + overview + relevant project context + relevant memories)
+The board data model still exists internally (each chat is a task on the internal board's backlog column), but the board columns, cards, drag-and-drop, and `CardDetailView` have all been removed from the UI. `HomeMainView` is locked to `"chats"`.
 
-Key adaptation: Phuong's tools now operate on the Kanban board (via workspace state save API) instead of the old file-based task system.
+### 6.1 Rebuild UI as projects-and-chats ✅
 
-### 6.2 Add Phuong tRPC procedures
+Files modified:
 
-File: `kanban/src/trpc/app-router.ts`
+- `kanban/web-ui/src/App.tsx` — removed `KanbanBoard` render, `CardDetailView`, board-mode branching, `handleOpenBoardFromSidebar`. `selectedCard` and `boardSelection` set to `null` constants. Sidebar always visible.
+- `kanban/web-ui/src/components/project-navigation-panel.tsx` — removed Board button, `isBoardView`/`onOpenBoard` props. Added "+ New Chat" button. Chat list items use collapsible toggle.
+- `kanban/web-ui/src/hooks/use-project-agent-chats.ts` — `HomeMainView` type narrowed from `"chats" | "board"` to `"chats"`.
+- `kanban/web-ui/src/hooks/use-home-project-agent-chat-panel.tsx` — empty state now shows "New Chat" button instead of "Create a task on the board" message. Accepts `onCreateNewChat` callback.
 
-Add a `phuong` sub-router:
+### 6.2 Add new chat creation ✅
 
-- `phuong.chat` — mutation, accepts message + conversationId, returns SSE stream
-- `phuong.listConversations` — query
-- `phuong.loadConversation` — query
-- `phuong.newConversation` — mutation
-- `phuong.getModels` — query
-- `phuong.getSessionStats` — query
+When the user clicks "+ New Chat" in the sidebar or the center panel empty state:
 
-### 6.3 Add Phuong chat panel to the UI
+1. `handleCreateNewChat` in `App.tsx` calls `addTaskToColumnWithResult(board, "backlog", ...)` with the project's default branch ref
+2. The new task is selected via `setSelectedTaskId`
+3. The `useHomeProjectAgentChatPanel` hook renders the appropriate agent panel (Pi terminal or Cline chat)
 
-File: `kanban/web-ui/src/` (new component)
+### 6.3 Add Phuong sidebar panel ✅
 
-Add a slide-out or split panel for chatting with Phuong:
+Phuong is integrated as a sidebar agent panel (`PhuongChatPanel`) using the existing Kanban sidebar agent surface. It can read project memory and orchestrate across projects.
 
-- text input with send button
-- SSE streaming response display
-- thinking/tool call rendering (reuse patterns from `archive/v1/review-ui/`)
-- conversation history selector
+### 6.4 Remaining Phase 6 work
 
-Mount this alongside the board, not replacing it. The board remains the primary surface. The Phuong panel is for planning and delegation.
+- Wire Phuong tools to create new chats and start tasks programmatically
+- Memory write-back from Phuong conversations
+- Phuong context assembly using the external memory service (system prompt → overview → project context → relevant memories)
 
-### 6.4 Wire Phuong tools to Kanban board
+### 6.5 Checkpoint
 
-Phuong's `create_task` tool should:
-
-1. read current workspace state via `workspace.getState`
-2. add a new card to the backlog column
-3. save via `workspace.saveState`
-
-Phuong's `start_task` tool should:
-
-1. trigger `runtime.startTaskSession` for the card
-
-This makes Phuong a first-class board operator.
-
-### 6.5 Verify
-
-- open the Phuong panel
-- send "create a task to add a README to project X"
-- Phuong creates a card on the board
-- start the task — pi runs it
-- Phuong can see task status
-
-### 6.6 Checkpoint
-
-Phuong is integrated as the manager. You can chat with Phuong and it manages the board. Commit.
+UI rebuilt as projects-and-chats. Phuong integrated as sidebar agent. New chat creation works. Committed and deployed.
 
 ---
 
@@ -435,29 +412,38 @@ clawdeploy/
 │   ├── src/
 │   │   ├── core/              # agent catalog (with pi), api contract
 │   │   ├── server/            # runtime server (with Clerk auth)
-│   │   ├── terminal/          # agent adapters (with pi adapter)
-│   │   ├── trpc/              # app router (with phuong + memory sub-routers)
-│   │   ├── manager/           # NEW: Phuong session, tools, context
-│   │   ├── memory/            # NEW: memory service, loader, sync
+│   │   ├── terminal/          # agent adapters (with pi adapter), session manager
+│   │   ├── trpc/              # app router (with memory sub-router)
+│   │   ├── memory/            # memory service, loader, sync
+│   │   ├── auth/              # Clerk JWT verification
 │   │   └── ...                # upstream Kanban modules
 │   ├── web-ui/
-│   │   ├── src/               # Kanban UI + Clerk + Phuong panel
+│   │   ├── src/
+│   │   │   ├── App.tsx                     # composition root (projects+chats layout)
+│   │   │   ├── components/
+│   │   │   │   ├── project-navigation-panel.tsx  # left sidebar (projects, chats, + New Chat)
+│   │   │   │   └── ...
+│   │   │   ├── hooks/
+│   │   │   │   ├── use-home-project-agent-chat-panel.tsx  # center panel agent chat logic
+│   │   │   │   ├── use-project-agent-chats.ts             # chat list state, localStorage persistence
+│   │   │   │   └── ...
+│   │   │   ├── auth/              # Clerk client-side auth gate
+│   │   │   ├── terminal/          # persistent terminal manager, WebSocket
+│   │   │   └── runtime/           # tRPC client, state stream
 │   │   └── ...
 │   ├── package.json
 │   └── ...
 ├── deploy/
 │   ├── ansible/               # VPS provisioning and deployment
-│   ├── nginx/                 # reverse proxy configs
-│   ├── terraform/             # cloud infra (optional)
 │   ├── deploy.sh
-│   └── setup-ssl.sh
+│   └── ...
 ├── docs/
 │   ├── BUILD-RUNSHEET.md      # this file
 │   ├── KANBAN-FULL-BUILD-PLAN.md
 │   ├── CLINE-KANBAN-ADOPTION-REPORT.md
 │   ├── MEMORY-SEPARATION.md
-│   ├── ARCHITECTURE.md        # old arch (reference)
-│   └── research/              # upstream research snapshots
+│   ├── ARCHITECTURE.md        # v1 arch (historical reference)
+│   └── ...
 ├── archive/
 │   └── v1/                    # old Phuong stack (reference only)
 ├── .gitignore
