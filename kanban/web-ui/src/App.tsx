@@ -85,6 +85,7 @@ export default function App(): ReactElement {
 	const [isClearTrashDialogOpen, setIsClearTrashDialogOpen] = useState(false);
 	const [isGitHistoryOpen, setIsGitHistoryOpen] = useState(false);
 	const [pendingTaskStartAfterEditId, setPendingTaskStartAfterEditId] = useState<string | null>(null);
+	const [pendingNewChatStartId, setPendingNewChatStartId] = useState<string | null>(null);
 	const taskEditorResetRef = useRef<() => void>(() => {});
 	const lastStreamErrorRef = useRef<string | null>(null);
 	const handleProjectSwitchStart = useCallback(() => {
@@ -430,6 +431,7 @@ export default function App(): ReactElement {
 		});
 		setBoard(created.board);
 		setSelectedTaskId(created.task.id);
+		setPendingNewChatStartId(created.task.id);
 	}, [board, defaultTaskBranchRef, setBoard]);
 
 	const homeProjectAgentChatPanel = useHomeProjectAgentChatPanel({
@@ -673,6 +675,18 @@ export default function App(): ReactElement {
 		handleStartTaskFromBoard(pendingTaskStartAfterEditId);
 		setPendingTaskStartAfterEditId(null);
 	}, [board, handleStartTaskFromBoard, pendingTaskStartAfterEditId]);
+
+	useEffect(() => {
+		if (!pendingNewChatStartId) {
+			return;
+		}
+		const selection = findCardSelection(board, pendingNewChatStartId);
+		if (!selection || selection.column.id !== "backlog") {
+			return;
+		}
+		handleStartTaskFromBoard(pendingNewChatStartId);
+		setPendingNewChatStartId(null);
+	}, [board, handleStartTaskFromBoard, pendingNewChatStartId]);
 
 	const detailTerminalSummary = detailTerminalTaskId ? (sessions[detailTerminalTaskId] ?? null) : null;
 
