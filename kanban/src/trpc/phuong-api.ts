@@ -79,14 +79,42 @@ export function createBoardOperations(
 		},
 
 		listCards: async () => {
-			const state = await loadWorkspaceState(workspacePath);
-			const cards: { id: string; prompt: string; column: string }[] = [];
-			for (const col of state.board.columns) {
+			const runtimeWorkspace = await ensureRuntimeWorkspace(workspacePath);
+			const runtimeClient = createRuntimeTrpcClient(runtimeWorkspace.workspaceId);
+			const runtimeState = await runtimeClient.workspace.getState.query();
+			const cards: { id: string; prompt: string; column: string; sessionState?: string }[] = [];
+			for (const col of runtimeState.board.columns) {
 				for (const card of col.cards) {
-					cards.push({ id: card.id, prompt: card.prompt, column: col.id });
+					const session = runtimeState.sessions[card.id];
+					cards.push({
+						id: card.id,
+						prompt: card.prompt,
+						column: col.id,
+						sessionState: session?.state,
+					});
 				}
 			}
 			return cards;
+		},
+
+		getSessionSummary: async (taskId: string) => {
+			try {
+				const runtimeWorkspace = await ensureRuntimeWorkspace(workspacePath);
+				const runtimeClient = createRuntimeTrpcClient(runtimeWorkspace.workspaceId);
+				const runtimeState = await runtimeClient.workspace.getState.query();
+				const session = runtimeState.sessions[taskId];
+				if (!session) {
+					return null;
+				}
+				return {
+					state: session.state,
+					exitCode: session.exitCode ?? null,
+					reviewReason: session.reviewReason ?? null,
+					lastActivity: session.latestHookActivity?.activityText ?? null,
+				};
+			} catch {
+				return null;
+			}
 		},
 
 		startTask: async (taskId: string) => {

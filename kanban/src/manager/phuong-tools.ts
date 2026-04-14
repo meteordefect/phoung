@@ -1,6 +1,5 @@
 import { Type } from "@sinclair/typebox";
 import type { ToolDefinition } from "@mariozechner/pi-coding-agent";
-import { randomUUID } from "node:crypto";
 import {
 	isMemoryConfigured,
 	listProjects,
@@ -11,65 +10,115 @@ import {
 
 export interface BoardOperations {
 	createCard: (prompt: string, baseRef?: string) => Promise<{ cardId: string }>;
-	listCards: () => Promise<{ id: string; prompt: string; column: string }[]>;
+	listCards: () => Promise<{ id: string; prompt: string; column: string; sessionState?: string }[]>;
 	startTask: (taskId: string) => Promise<{ ok: boolean; error?: string }>;
+	getSessionSummary: (taskId: string) => Promise<{
+		state: string;
+		exitCode: number | null;
+		reviewReason: string | null;
+		lastActivity: string | null;
+	} | null>;
 }
 
 export function createPhuongTools(boardOps: BoardOperations): ToolDefinition[] {
-	const createTaskTool: ToolDefinition = {
-		name: "create_task",
-		label: "Create Task",
+	const createChatTool: ToolDefinition = {
+		name: "create_chat",
+		label: "Create Chat",
 		description:
-			"Create a new task card on the Kanban board. The card will appear in the Backlog column. " +
-			"Use this when the user asks you to plan, break down, or create work items.",
+			"Create and start a new agent chat session. A Pi coding agent will immediately begin working on the instructions you provide. " +
+			"Use this when the user asks you to do work, break down tasks, or execute changes.",
 		parameters: Type.Object({
 			prompt: Type.String({
-				description: "Detailed task instructions for the coding agent that will execute this task",
+				description: "Detailed instructions for the Pi coding agent that will work in this chat session",
 			}),
 		}),
 		execute: async (_toolCallId, params) => {
 			const { prompt } = params as { prompt: string };
 			const result = await boardOps.createCard(prompt);
+			const startResult = await boardOps.startTask(result.cardId);
+			if (!startResult.ok) {
+				return {
+					content: [{ type: "text" as const, text: `Chat created (${result.cardId}) but failed to start: ${startResult.error}` }],
+					details: {},
+				};
+			}
 			return {
-				content: [{ type: "text" as const, text: `Task created (${result.cardId}). It is now in the Backlog column.` }],
+				content: [{ type: "text" as const, text: `Chat created and started (${result.cardId}). The Pi agent is now working on it. The user can click into this chat from the sidebar to see progress.` }],
 				details: {},
 			};
 		},
 	};
 
-	const listTasksTool: ToolDefinition = {
-		name: "list_tasks",
-		label: "List Tasks",
-		description: "List all tasks on the Kanban board with their current column/status.",
+	const listChatsTool: ToolDefinition = {
+		name: "list_chats",
+		label: "List Chats",
+		description: "List all agent chat sessions for the current project with their status.",
 		parameters: Type.Object({}),
 		execute: async () => {
 			const cards = await boardOps.listCards();
 			if (cards.length === 0) {
-				return { content: [{ type: "text" as const, text: "No tasks on the board." }], details: {} };
+				return { content: [{ type: "text" as const, text: "No agent chats yet." }], details: {} };
 			}
-			const lines = cards.map((c) => `- [${c.column}] ${c.prompt.slice(0, 120)}${c.prompt.length > 120 ? "..." : ""}`);
+			const lines = cards.map((c) => {
+				const status = c.sessionState ?? c.column;
+				const preview = c.prompt ? c.prompt.slice(0, 120) + (c.prompt.length > 120 ? "..." : "") : "(no prompt)";
+				return `- [${status}] (${c.id}) ${preview}`;
+			});
 			return { content: [{ type: "text" as const, text: lines.join("\n") }], details: {} };
 		},
 	};
 
-	const startTaskTool: ToolDefinition = {
-		name: "start_task",
-		label: "Start Task",
-		description: "Start a task from the Backlog. The coding agent will pick it up and begin working.",
+	const startChatTool: ToolDefinition = {
+		name: "start_chat",
+		label: "Start Chat",
+		description: "Resume an idle or stopped agent chat session. Use this to restart a chat that was previously created but is not running.",
 		parameters: Type.Object({
-			task_id: Type.String({ description: "The task ID to start" }),
+			chat_id: Type.String({ description: "The chat/task ID to start or resume" }),
 		}),
 		execute: async (_toolCallId, params) => {
-			const { task_id } = params as { task_id: string };
-			const result = await boardOps.startTask(task_id);
+			const { chat_id } = params as { chat_id: string };
+			const result = await boardOps.startTask(chat_id);
 			if (!result.ok) {
 				return {
-					content: [{ type: "text" as const, text: `Failed to start task: ${result.error}` }],
+					content: [{ type: "text" as const, text: `Failed to start chat: ${result.error}` }],
 					details: {},
 				};
 			}
 			return {
-				content: [{ type: "text" as const, text: `Task ${task_id} started. The coding agent is now working on it.` }],
+				content: [{ type: "text" as const, text: `Chat ${chat_id} started. The Pi agent is now working on it.` }],
+				details: {},
+			};
+		},
+	};
+
+	const checkChatStatusTool: ToolDefinition = {
+		name: "check_chat_status",
+		label: "Check Chat Status",
+		description: "Check the current status of an agent chat session — whether it is running, completed, failed, or idle.",
+		parameters: Type.Object({
+			chat_id: Type.String({ description: "The chat/task ID to check" }),
+		}),
+		execute: async (_toolCallId, params) => {
+			const { chat_id } = params as { chat_id: string };
+			const summary = await boardOps.getSessionSummary(chat_id);
+			if (!summary) {
+				return {
+					content: [{ type: "text" as const, text: `No session found for chat ${chat_id}. It may not have been started yet.` }],
+					details: {},
+				};
+			}
+			const parts = [`State: ${summary.state}`];
+			if (summary.exitCode !== null) {
+				parts.push(`Exit code: ${summary.exitCode}`);
+			}
+			if (summary.reviewReason) {
+				parts.push(`Review reason: ${summary.reviewReason}`);
+			}
+			if (summary.lastActivity) {
+				parts.push(`Last activity: ${summary.lastActivity}`);
+			}
+			return {
+				content: [{ type: "text" as const, text: parts.join("\n") }],
 				details: {},
 			};
 		},
@@ -153,9 +202,10 @@ export function createPhuongTools(boardOps: BoardOperations): ToolDefinition[] {
 	};
 
 	return [
-		createTaskTool,
-		listTasksTool,
-		startTaskTool,
+		createChatTool,
+		listChatsTool,
+		startChatTool,
+		checkChatStatusTool,
 		listProjectsTool,
 		loadMemoryTool,
 		listProjectMemoriesTool,
