@@ -1,6 +1,6 @@
 import * as Collapsible from "@radix-ui/react-collapsible";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { ChevronDown, ChevronUp, Ellipsis, Maximize2, Minimize2, Plus } from "lucide-react";
+import { ChevronDown, ChevronUp, Ellipsis, LayoutGrid, Maximize2, MessageSquare, Minimize2, Plus } from "lucide-react";
 import { type MouseEvent as ReactMouseEvent, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ClineIcon } from "@/components/ui/cline-icon";
@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { Kbd } from "@/components/ui/kbd";
 import { Spinner } from "@/components/ui/spinner";
+import type { HomeMainView, ProjectAgentChatItem } from "@/hooks/use-project-agent-chats";
 import type { RuntimeProjectSummary } from "@/runtime/types";
 import { formatPathForDisplay } from "@/utils/path-display";
 import { isMacPlatform, modifierKeyLabel } from "@/utils/platform";
@@ -38,7 +39,12 @@ export function ProjectNavigationPanel({
 	onActiveSectionChange,
 	canShowAgentSection,
 	agentSectionContent,
+	chatsByProject,
+	selectedTaskId,
+	homeMainView,
 	onSelectProject,
+	onOpenBoard,
+	onSelectAgentChat,
 	onRemoveProject,
 	onAddProject,
 }: {
@@ -50,7 +56,12 @@ export function ProjectNavigationPanel({
 	onActiveSectionChange: (section: "projects" | "agent") => void;
 	canShowAgentSection: boolean;
 	agentSectionContent?: ReactNode;
+	chatsByProject: Record<string, ProjectAgentChatItem[]>;
+	selectedTaskId: string | null;
+	homeMainView: HomeMainView;
 	onSelectProject: (projectId: string) => void;
+	onOpenBoard: (projectId: string) => void;
+	onSelectAgentChat: (projectId: string, taskId: string) => void;
 	onRemoveProject: (projectId: string) => Promise<boolean>;
 	onAddProject: () => void;
 }): React.ReactElement {
@@ -214,8 +225,8 @@ export function ProjectNavigationPanel({
 				{activeSection === "agent" ? (
 					<div className="flex items-start gap-2" style={{ padding: "8px 4px 0" }}>
 						<p className="flex-1 text-text-tertiary text-xs">
-							Plan work, create tasks, and manage your board. Phuong remembers your projects and
-							can break features into actionable tasks.
+							Orchestrate across projects: plan work, route to agent chats, and use the board when you
+							need columns. Phuong can read project memory when configured.
 						</p>
 						<Button
 							variant="ghost"
@@ -248,7 +259,12 @@ export function ProjectNavigationPanel({
 								project={project}
 								isCurrent={currentProjectId === project.id}
 								removingProjectId={removingProjectId}
+								chats={chatsByProject[project.id] ?? []}
+								selectedTaskId={currentProjectId === project.id ? selectedTaskId : null}
+								isBoardView={currentProjectId === project.id && homeMainView === "board"}
 								onSelect={onSelectProject}
+								onOpenBoard={onOpenBoard}
+								onSelectAgentChat={onSelectAgentChat}
 								onRemove={(projectId) => {
 									const found = sortedProjects.find((item) => item.id === projectId);
 									if (!found) {
@@ -459,13 +475,23 @@ function ProjectRow({
 	project,
 	isCurrent,
 	removingProjectId,
+	chats,
+	selectedTaskId,
+	isBoardView,
 	onSelect,
+	onOpenBoard,
+	onSelectAgentChat,
 	onRemove,
 }: {
 	project: RuntimeProjectSummary;
 	isCurrent: boolean;
 	removingProjectId: string | null;
+	chats: ProjectAgentChatItem[];
+	selectedTaskId: string | null;
+	isBoardView: boolean;
 	onSelect: (id: string) => void;
+	onOpenBoard: (projectId: string) => void;
+	onSelectAgentChat: (projectId: string, taskId: string) => void;
 	onRemove: (id: string) => void;
 }): React.ReactElement {
 	const displayPath = formatPathForDisplay(project.path);
@@ -505,60 +531,60 @@ function ProjectRow({
 
 	return (
 		<div
-			role="button"
-			tabIndex={0}
-			onClick={() => onSelect(project.id)}
-			onKeyDown={(e) => {
-				if (e.key === "Enter" || e.key === " ") {
-					e.preventDefault();
-					onSelect(project.id);
-				}
-			}}
-			className={cn("kb-project-row cursor-pointer rounded-md", isCurrent && "kb-project-row-selected")}
+			className={cn("kb-project-row rounded-md", isCurrent && "kb-project-row-selected")}
 			style={{
-				display: "flex",
-				alignItems: "center",
-				gap: 6,
 				padding: "6px 8px",
 			}}
 		>
-			<div className="flex-1 min-w-0">
-				<div
-					className={cn(
-						"font-medium whitespace-nowrap overflow-hidden text-ellipsis text-sm",
-						isCurrent ? "text-white" : "text-text-primary",
-					)}
-				>
-					{project.name}
-				</div>
-				<div
-					className={cn(
-						"font-mono text-[10px] whitespace-nowrap overflow-hidden text-ellipsis",
-						isCurrent ? "text-white/60" : "text-text-secondary",
-					)}
-				>
-					{displayPath}
-				</div>
-				{taskCountBadges.length > 0 ? (
-					<div className="flex gap-1 mt-1">
-						{taskCountBadges.map((badge) => (
-							<span
-								key={badge.id}
-								className={cn(
-									"inline-flex items-center gap-1 rounded-full text-[10px] px-1.5 py-px font-medium",
-									isCurrent ? "bg-white/20 text-white" : badge.toneClassName,
-								)}
-								title={badge.title}
-							>
-								<span>{badge.shortLabel}</span>
-								<span style={{ opacity: 0.4 }}>|</span>
-								<span>{badge.count}</span>
-							</span>
-						))}
+			<div
+				role="button"
+				tabIndex={0}
+				onClick={() => onSelect(project.id)}
+				onKeyDown={(e) => {
+					if (e.key === "Enter" || e.key === " ") {
+						e.preventDefault();
+						onSelect(project.id);
+					}
+				}}
+				className="cursor-pointer flex items-center gap-1.5"
+			>
+				<div className="flex-1 min-w-0">
+					<div
+						className={cn(
+							"font-medium whitespace-nowrap overflow-hidden text-ellipsis text-sm",
+							isCurrent ? "text-white" : "text-text-primary",
+						)}
+					>
+						{project.name}
 					</div>
-				) : null}
-			</div>
-			<div className="kb-project-row-actions flex items-center" style={isMenuOpen ? { opacity: 1 } : undefined}>
+					<div
+						className={cn(
+							"font-mono text-[10px] whitespace-nowrap overflow-hidden text-ellipsis",
+							isCurrent ? "text-white/60" : "text-text-secondary",
+						)}
+					>
+						{displayPath}
+					</div>
+					{taskCountBadges.length > 0 ? (
+						<div className="flex gap-1 mt-1">
+							{taskCountBadges.map((badge) => (
+								<span
+									key={badge.id}
+									className={cn(
+										"inline-flex items-center gap-1 rounded-full text-[10px] px-1.5 py-px font-medium",
+										isCurrent ? "bg-white/20 text-white" : badge.toneClassName,
+									)}
+									title={badge.title}
+								>
+									<span>{badge.shortLabel}</span>
+									<span style={{ opacity: 0.4 }}>|</span>
+									<span>{badge.count}</span>
+								</span>
+							))}
+						</div>
+					) : null}
+				</div>
+				<div className="kb-project-row-actions flex items-center" style={isMenuOpen ? { opacity: 1 } : undefined}>
 				<DropdownMenu.Root open={isMenuOpen} onOpenChange={setIsMenuOpen}>
 					<DropdownMenu.Trigger asChild>
 						<Button
@@ -590,7 +616,48 @@ function ProjectRow({
 						</DropdownMenu.Content>
 					</DropdownMenu.Portal>
 				</DropdownMenu.Root>
+				</div>
 			</div>
+			{isCurrent ? (
+				<div className="mt-1.5 ml-0.5 flex flex-col gap-0.5 border-l border-border pl-2">
+					<button
+						type="button"
+						onClick={(e) => {
+							e.stopPropagation();
+							onOpenBoard(project.id);
+						}}
+						className={cn(
+							"flex w-full cursor-pointer items-center gap-1.5 rounded-sm px-1.5 py-1 text-left text-xs",
+							isBoardView ? "bg-surface-4 text-text-primary" : "text-text-secondary hover:bg-surface-3 hover:text-text-primary",
+						)}
+					>
+						<LayoutGrid size={12} className="shrink-0 opacity-80" />
+						<span className="min-w-0 truncate">Board</span>
+					</button>
+					{chats.map((chat) => {
+						const isChatSelected = !isBoardView && selectedTaskId === chat.id;
+						return (
+							<button
+								key={chat.id}
+								type="button"
+								onClick={(e) => {
+									e.stopPropagation();
+									onSelectAgentChat(project.id, chat.id);
+								}}
+								className={cn(
+									"flex w-full cursor-pointer items-center gap-1.5 rounded-sm px-1.5 py-1 text-left text-xs",
+									isChatSelected
+										? "bg-surface-4 text-text-primary"
+										: "text-text-secondary hover:bg-surface-3 hover:text-text-primary",
+								)}
+							>
+								<MessageSquare size={12} className="shrink-0 opacity-80" />
+								<span className="min-w-0 truncate">{chat.title}</span>
+							</button>
+						);
+					})}
+				</div>
+			) : null}
 		</div>
 	);
 }

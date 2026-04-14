@@ -40,7 +40,8 @@ import { useBoardInteractions } from "@/hooks/use-board-interactions";
 import { useDebugTools } from "@/hooks/use-debug-tools";
 import { useDocumentVisibility } from "@/hooks/use-document-visibility";
 import { useGitActions } from "@/hooks/use-git-actions";
-import { useHomeSidebarAgentPanel } from "@/hooks/use-home-sidebar-agent-panel";
+import { useHomeProjectAgentChatPanel } from "@/hooks/use-home-project-agent-chat-panel";
+import { useProjectAgentChats } from "@/hooks/use-project-agent-chats";
 import { PhuongChatPanel } from "@/components/phuong/phuong-chat-panel";
 import { useKanbanAccessGate } from "@/hooks/use-kanban-access-gate";
 import { useOpenWorkspace } from "@/hooks/use-open-workspace";
@@ -207,6 +208,38 @@ export default function App(): ReactElement {
 		}
 		return findCardSelection(board, selectedTaskId);
 	}, [board, selectedTaskId]);
+
+	const { chatsByProject, homeMainView, setHomeMainView } = useProjectAgentChats({
+		currentProjectId,
+		board,
+	});
+
+	const firstBoardTaskId = useMemo(() => {
+		for (const column of board.columns) {
+			const first = column.cards[0];
+			if (first) {
+				return first.id;
+			}
+		}
+		return null;
+	}, [board]);
+
+	useEffect(() => {
+		if (selectedCard) {
+			return;
+		}
+		if (homeMainView !== "chats") {
+			return;
+		}
+		if (selectedTaskId !== null) {
+			return;
+		}
+		if (!firstBoardTaskId) {
+			return;
+		}
+		setSelectedTaskId(firstBoardTaskId);
+	}, [firstBoardTaskId, homeMainView, selectedCard, selectedTaskId]);
+
 	const {
 		workspacePath,
 		workspaceGit,
@@ -422,15 +455,17 @@ export default function App(): ReactElement {
 		terminalBackgroundColor: TERMINAL_THEME_COLORS.surfacePrimary,
 	});
 	const homeTerminalSummary = sessions[homeTerminalTaskId] ?? null;
-	const homeSidebarAgentPanel = useHomeSidebarAgentPanel({
+	const homeProjectAgentChatPanel = useHomeProjectAgentChatPanel({
 		currentProjectId,
 		hasNoProjects,
 		runtimeProjectConfig,
-		clineSessionContextVersion,
+		board,
+		selectedTaskId: !selectedCard && homeMainView === "chats" ? selectedTaskId : null,
 		taskSessions: sessions,
-		workspaceGit,
+		clineSessionContextVersion,
 		latestTaskChatMessage,
 		taskChatMessagesByTaskId,
+		onSessionSummary: upsertSession,
 	});
 	const { runningShortcutLabel, handleSelectShortcutLabel, handleRunShortcut, handleCreateShortcut } = useShortcutActions({
 		currentProjectId,
@@ -547,6 +582,28 @@ export default function App(): ReactElement {
 		setSelectedTaskId(null);
 		setIsGitHistoryOpen(false);
 	}, []);
+
+	const handleOpenBoardFromSidebar = useCallback(
+		(projectId: string) => {
+			if (navigationCurrentProjectId !== projectId) {
+				void handleSelectProject(projectId);
+			}
+			setHomeMainView("board");
+			setSelectedTaskId(null);
+		},
+		[handleSelectProject, navigationCurrentProjectId, setHomeMainView],
+	);
+
+	const handleSelectAgentChatFromSidebar = useCallback(
+		(projectId: string, taskId: string) => {
+			if (navigationCurrentProjectId !== projectId) {
+				void handleSelectProject(projectId);
+			}
+			setHomeMainView("chats");
+			setSelectedTaskId(taskId);
+		},
+		[handleSelectProject, navigationCurrentProjectId, setHomeMainView],
+	);
 
 	const handleOpenSettings = useCallback((section?: RuntimeSettingsSection) => {
 		setSettingsInitialSection(section ?? null);
@@ -767,9 +824,14 @@ export default function App(): ReactElement {
 					onActiveSectionChange={setHomeSidebarSection}
 					canShowAgentSection={!hasNoProjects && Boolean(currentProjectId)}
 					agentSectionContent={<PhuongChatPanel workspaceId={currentProjectId} />}
+					chatsByProject={chatsByProject}
+					selectedTaskId={selectedTaskId}
+					homeMainView={homeMainView}
 					onSelectProject={(projectId) => {
 						void handleSelectProject(projectId);
 					}}
+					onOpenBoard={handleOpenBoardFromSidebar}
+					onSelectAgentChat={handleSelectAgentChatFromSidebar}
 					onRemoveProject={handleRemoveProject}
 					onAddProject={() => {
 						void handleAddProject();
@@ -875,6 +937,10 @@ export default function App(): ReactElement {
 											}}
 											isDiscardWorkingChangesPending={isDiscardingHomeWorkingChanges}
 										/>
+									) : homeMainView === "chats" ? (
+										<div className="flex flex-1 min-h-0 min-w-0 flex-col overflow-hidden">
+											{homeProjectAgentChatPanel}
+										</div>
 									) : (
 										<KanbanBoard
 											data={board}

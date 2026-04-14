@@ -82,5 +82,5 @@ kanban/dist/
 # Research clones with embedded secrets/git repos
 docs/research/pi-mono/
 
-# Memory (lives in external repo, never in app repo)
-memory/
+# Memory (external clone at repo root only; allow in-repo stubs under kanban/src/memory)
+/memory/
