@@ -59,6 +59,7 @@ import {
 	getTaskAgentNavbarHint,
 	isTaskAgentSetupSatisfied,
 } from "@/runtime/native-agent";
+import { useIsMobile } from "@/utils/react-use";
 import type { RuntimeTaskSessionSummary } from "@/runtime/types";
 import { useRuntimeProjectConfig } from "@/runtime/use-runtime-project-config";
 import { useTerminalConnectionReady } from "@/runtime/use-terminal-connection-ready";
@@ -84,6 +85,8 @@ export default function App(): ReactElement {
 	const [homeSidebarSection, setHomeSidebarSection] = useState<"projects" | "agent">("projects");
 	const [isClearTrashDialogOpen, setIsClearTrashDialogOpen] = useState(false);
 	const [isGitHistoryOpen, setIsGitHistoryOpen] = useState(false);
+	const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+	const isMobile = useIsMobile();
 	const [pendingTaskStartAfterEditId, setPendingTaskStartAfterEditId] = useState<string | null>(null);
 	const [pendingNewChatStartId, setPendingNewChatStartId] = useState<string | null>(null);
 	const taskEditorResetRef = useRef<() => void>(() => {});
@@ -92,6 +95,7 @@ export default function App(): ReactElement {
 		setCanPersistWorkspaceState(false);
 		setSelectedTaskId(null);
 		setIsGitHistoryOpen(false);
+		setIsMobileSidebarOpen(false);
 		setPendingTaskStartAfterEditId(null);
 		taskEditorResetRef.current();
 	}, []);
@@ -561,6 +565,13 @@ export default function App(): ReactElement {
 		[navigationProjectPath, workspacePath],
 	);
 
+	const handleToggleMobileSidebar = useCallback(() => {
+		setIsMobileSidebarOpen((prev) => !prev);
+	}, []);
+	const handleCloseMobileSidebar = useCallback(() => {
+		setIsMobileSidebarOpen(false);
+	}, []);
+
 	const handleBack = useCallback(() => {
 		setSelectedTaskId(null);
 		setIsGitHistoryOpen(false);
@@ -759,29 +770,30 @@ export default function App(): ReactElement {
 
 	return (
 		<div className="flex h-[100svh] min-w-0 overflow-hidden">
-			{(
-				<ProjectNavigationPanel
-					projects={displayedProjects}
-					isLoadingProjects={isProjectListLoading}
-					currentProjectId={navigationCurrentProjectId}
-					removingProjectId={removingProjectId}
-					activeSection={homeSidebarSection}
-					onActiveSectionChange={setHomeSidebarSection}
-					canShowAgentSection={!hasNoProjects && Boolean(currentProjectId)}
-					agentSectionContent={<PhuongChatPanel workspaceId={currentProjectId} />}
-					chatsByProject={chatsByProject}
-					selectedTaskId={selectedTaskId}
-					onSelectProject={(projectId) => {
-						void handleSelectProject(projectId);
-					}}
-					onSelectAgentChat={handleSelectAgentChatFromSidebar}
-					onCreateNewChat={handleCreateNewChat}
-					onRemoveProject={handleRemoveProject}
-					onAddProject={() => {
-						void handleAddProject();
-					}}
-				/>
-			)}
+			<ProjectNavigationPanel
+				projects={displayedProjects}
+				isLoadingProjects={isProjectListLoading}
+				currentProjectId={navigationCurrentProjectId}
+				removingProjectId={removingProjectId}
+				activeSection={homeSidebarSection}
+				onActiveSectionChange={setHomeSidebarSection}
+				canShowAgentSection={!hasNoProjects && Boolean(currentProjectId)}
+				agentSectionContent={<PhuongChatPanel workspaceId={currentProjectId} />}
+				chatsByProject={chatsByProject}
+				selectedTaskId={selectedTaskId}
+				onSelectProject={(projectId) => {
+					void handleSelectProject(projectId);
+				}}
+				onSelectAgentChat={handleSelectAgentChatFromSidebar}
+				onCreateNewChat={handleCreateNewChat}
+				onRemoveProject={handleRemoveProject}
+				onAddProject={() => {
+					void handleAddProject();
+				}}
+				isMobile={isMobile}
+				isMobileOpen={isMobileSidebarOpen}
+				onMobileClose={handleCloseMobileSidebar}
+			/>
 			<div className="flex flex-col flex-1 min-w-0 overflow-hidden">
 				<TopBar
 					onBack={selectedTaskId ? handleBack : undefined}
@@ -817,6 +829,8 @@ export default function App(): ReactElement {
 					onToggleGitHistory={hasNoProjects ? undefined : handleToggleGitHistory}
 					isGitHistoryOpen={isGitHistoryOpen}
 					hideProjectDependentActions={shouldHideProjectDependentTopBarActions}
+					isMobile={isMobile}
+					onToggleMobileSidebar={handleToggleMobileSidebar}
 				/>
 				<div className="relative flex flex-1 min-h-0 min-w-0 overflow-hidden">
 					<div className="kb-home-layout">

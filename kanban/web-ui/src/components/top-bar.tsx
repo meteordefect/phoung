@@ -10,6 +10,7 @@ import {
 	CircleArrowDown,
 	Command,
 	GitBranch,
+	Menu,
 	Play,
 	Plus,
 	Settings,
@@ -311,6 +312,8 @@ export function TopBar({
 	canOpenWorkspace,
 	isOpeningWorkspace,
 	hideProjectDependentActions = false,
+	isMobile = false,
+	onToggleMobileSidebar,
 }: {
 	onBack?: () => void;
 	workspacePath?: string;
@@ -345,6 +348,8 @@ export function TopBar({
 	canOpenWorkspace: boolean;
 	isOpeningWorkspace: boolean;
 	hideProjectDependentActions?: boolean;
+	isMobile?: boolean;
+	onToggleMobileSidebar?: () => void;
 }): React.ReactElement {
 	const displayWorkspacePath = workspacePath ? formatPathForDisplay(workspacePath) : null;
 	const workspaceSegments = displayWorkspacePath ? getWorkspacePathSegments(displayWorkspacePath) : [];
@@ -399,7 +404,7 @@ export function TopBar({
 			<nav
 			className="flex flex-nowrap items-center h-10 min-h-[40px] min-w-0 bg-surface-1"
 			style={{
-				paddingLeft: onBack ? 6 : 12,
+				paddingLeft: isMobile ? 4 : (onBack ? 6 : 12),
 				paddingRight: 8,
 				borderBottom: "1px solid var(--color-divider)",
 			}}
@@ -407,6 +412,16 @@ export function TopBar({
 			<div
 				className="flex flex-nowrap items-center h-10 flex-1 min-w-0 overflow-hidden gap-1.5"
 			>
+				{isMobile && onToggleMobileSidebar ? (
+					<Button
+						variant="ghost"
+						size="sm"
+						icon={<Menu size={18} />}
+						onClick={onToggleMobileSidebar}
+						aria-label="Toggle sidebar"
+						className="shrink-0"
+					/>
+				) : null}
 				{onBack ? (
 					<div className="flex items-center shrink-0 overflow-visible">
 						<Button
@@ -419,82 +434,101 @@ export function TopBar({
 						/>
 					</div>
 				) : null}
-				{isWorkspacePathLoading ? (
+				{isMobile ? (
+				displayWorkspacePath ? (
+					<span
+						className="font-mono truncate text-xs text-text-primary min-w-0"
+						title={workspacePath}
+					>
+						{workspaceSegments[workspaceSegments.length - 1] ?? ""}
+					</span>
+				) : isWorkspacePathLoading ? (
 					<span
 						className="kb-skeleton inline-block"
-						style={{ height: 14, width: 320, borderRadius: 3 }}
+						style={{ height: 14, width: 100, borderRadius: 3 }}
 						aria-hidden
 					/>
-				) : displayWorkspacePath ? (
-					<div className="shrink min-w-0 max-w-[640px] overflow-hidden">
+				) : null
+			) : (
+				<>
+					{isWorkspacePathLoading ? (
 						<span
-							className="font-mono truncate block w-full min-w-0 text-xs max-w-full text-text-secondary"
-							title={workspacePath}
-							data-testid="workspace-path"
-						>
-							{hasAbsoluteLeadingSlash ? "/" : ""}
-							{workspaceSegments.map((segment, index) => {
-								const isLast = index === workspaceSegments.length - 1;
-								return (
-									<span key={`${segment}-${index}`}>
-										{index === 0 ? "" : "/"}
-										<span className={isLast ? "text-text-primary" : undefined}>{segment}</span>
-									</span>
-								);
-							})}
-						</span>
-					</div>
-				) : null}
-				{displayWorkspacePath && !isWorkspacePathLoading ? (
-					<div className="ml-2 shrink-0">
-						<OpenWorkspaceButton
-							options={openTargetOptions}
-							selectedOptionId={selectedOpenTargetId}
-							disabled={!canOpenWorkspace || isOpeningWorkspace}
-							loading={isOpeningWorkspace}
-							onOpen={onOpenWorkspace}
-							onSelectOption={onSelectOpenTarget}
+							className="kb-skeleton inline-block"
+							style={{ height: 14, width: 320, borderRadius: 3 }}
+							aria-hidden
 						/>
-					</div>
-				) : null}
-				{!hideProjectDependentActions && workspaceHint ? (
-					<span className="kb-navbar-tag inline-flex items-center rounded border border-border bg-surface-2 px-1.5 py-0.5 text-xs text-text-secondary">
-						{workspaceHint}
-					</span>
-				) : null}
-				{!hideProjectDependentActions && runtimeHint ? (
-					onOpenSettings ? (
-						<button
-							type="button"
-							onClick={() => onOpenSettings()}
-							className="kb-navbar-tag inline-flex items-center rounded border border-status-orange/30 bg-status-orange/10 px-1.5 py-0.5 text-xs text-status-orange transition-colors hover:bg-status-orange/15 focus:outline-none focus:ring-2 focus:ring-border-focus focus:ring-offset-0"
-						>
-							{runtimeHint}
-						</button>
-					) : (
-						<span className="kb-navbar-tag inline-flex items-center rounded border border-status-orange/30 bg-status-orange/10 px-1.5 py-0.5 text-xs text-status-orange">
-							{runtimeHint}
+					) : displayWorkspacePath ? (
+						<div className="shrink min-w-0 max-w-[640px] overflow-hidden">
+							<span
+								className="font-mono truncate block w-full min-w-0 text-xs max-w-full text-text-secondary"
+								title={workspacePath}
+								data-testid="workspace-path"
+							>
+								{hasAbsoluteLeadingSlash ? "/" : ""}
+								{workspaceSegments.map((segment, index) => {
+									const isLast = index === workspaceSegments.length - 1;
+									return (
+										<span key={`${segment}-${index}`}>
+											{index === 0 ? "" : "/"}
+											<span className={isLast ? "text-text-primary" : undefined}>{segment}</span>
+										</span>
+									);
+								})}
+							</span>
+						</div>
+					) : null}
+					{displayWorkspacePath && !isWorkspacePathLoading ? (
+						<div className="ml-2 shrink-0">
+							<OpenWorkspaceButton
+								options={openTargetOptions}
+								selectedOptionId={selectedOpenTargetId}
+								disabled={!canOpenWorkspace || isOpeningWorkspace}
+								loading={isOpeningWorkspace}
+								onOpen={onOpenWorkspace}
+								onSelectOption={onSelectOpenTarget}
+							/>
+						</div>
+					) : null}
+					{!hideProjectDependentActions && workspaceHint ? (
+						<span className="kb-navbar-tag inline-flex items-center rounded border border-border bg-surface-2 px-1.5 py-0.5 text-xs text-text-secondary">
+							{workspaceHint}
 						</span>
-					)
-				) : null}
-				{!hideProjectDependentActions ? (
-					<TopBarGitStatusSection
-						showHomeGitSummary={showHomeGitSummary === true}
-						selectedTaskId={selectedTaskId ?? null}
-						selectedTaskBaseRef={selectedTaskBaseRef ?? null}
-						onToggleGitHistory={onToggleGitHistory}
-						isGitHistoryOpen={isGitHistoryOpen}
-						runningGitAction={runningGitAction}
-						onGitFetch={onGitFetch}
-						onGitPull={onGitPull}
-						onGitPush={onGitPush}
-					/>
-				) : null}
+					) : null}
+					{!hideProjectDependentActions && runtimeHint ? (
+						onOpenSettings ? (
+							<button
+								type="button"
+								onClick={() => onOpenSettings()}
+								className="kb-navbar-tag inline-flex items-center rounded border border-status-orange/30 bg-status-orange/10 px-1.5 py-0.5 text-xs text-status-orange transition-colors hover:bg-status-orange/15 focus:outline-none focus:ring-2 focus:ring-border-focus focus:ring-offset-0"
+							>
+								{runtimeHint}
+							</button>
+						) : (
+							<span className="kb-navbar-tag inline-flex items-center rounded border border-status-orange/30 bg-status-orange/10 px-1.5 py-0.5 text-xs text-status-orange">
+								{runtimeHint}
+							</span>
+						)
+					) : null}
+					{!hideProjectDependentActions ? (
+						<TopBarGitStatusSection
+							showHomeGitSummary={showHomeGitSummary === true}
+							selectedTaskId={selectedTaskId ?? null}
+							selectedTaskBaseRef={selectedTaskBaseRef ?? null}
+							onToggleGitHistory={onToggleGitHistory}
+							isGitHistoryOpen={isGitHistoryOpen}
+							runningGitAction={runningGitAction}
+							onGitFetch={onGitFetch}
+							onGitPull={onGitPull}
+							onGitPush={onGitPush}
+						/>
+					) : null}
+				</>
+			)}
 			</div>
 			<div
 				className="flex flex-nowrap items-center h-10 pr-0.5 shrink-0"
 			>
-				{!hideProjectDependentActions && onRunShortcut ? (
+				{!isMobile && !hideProjectDependentActions && onRunShortcut ? (
 					selectedShortcut ? (
 						<div className="flex">
 							<Button
@@ -572,7 +606,7 @@ export function TopBar({
 						</Button>
 					) : null
 				) : null}
-				{onToggleTerminal ? (
+				{!isMobile && onToggleTerminal ? (
 					<Tooltip
 						side="bottom"
 						content={

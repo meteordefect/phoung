@@ -46,6 +46,9 @@ export function ProjectNavigationPanel({
 	onCreateNewChat,
 	onRemoveProject,
 	onAddProject,
+	isMobile = false,
+	isMobileOpen = false,
+	onMobileClose,
 }: {
 	projects: RuntimeProjectSummary[];
 	isLoadingProjects?: boolean;
@@ -62,9 +65,26 @@ export function ProjectNavigationPanel({
 	onCreateNewChat: () => void;
 	onRemoveProject: (projectId: string) => Promise<boolean>;
 	onAddProject: () => void;
+	isMobile?: boolean;
+	isMobileOpen?: boolean;
+	onMobileClose?: () => void;
 }): React.ReactElement {
 	const sortedProjects = [...projects].sort((a, b) => a.path.localeCompare(b.path));
 
+	const handleProjectSelect = useCallback((projectId: string) => {
+		onSelectProject(projectId);
+		onMobileClose?.();
+	}, [onSelectProject, onMobileClose]);
+
+	const handleAgentChatSelect = useCallback((projectId: string, taskId: string) => {
+		onSelectAgentChat(projectId, taskId);
+		onMobileClose?.();
+	}, [onSelectAgentChat, onMobileClose]);
+
+	const handleNewChat = useCallback(() => {
+		onCreateNewChat();
+		onMobileClose?.();
+	}, [onCreateNewChat, onMobileClose]);
 
 	const [pendingProjectRemoval, setPendingProjectRemoval] = useState<RuntimeProjectSummary | null>(null);
 	const isProjectRemovalPending = pendingProjectRemoval !== null && removingProjectId === pendingProjectRemoval.id;
@@ -129,60 +149,74 @@ export function ProjectNavigationPanel({
 		}
 	}, [activeSection]);
 
-	if (isCollapsed) {
-		return (
-			<aside
-				className="flex flex-col items-center min-h-0 overflow-hidden bg-surface-1 relative shrink-0 py-2 gap-1.5"
-				style={{
-					width: COLLAPSED_WIDTH,
-					minWidth: COLLAPSED_WIDTH,
-					borderRight: "1px solid var(--color-divider)",
-				}}
-			>
-				<div onMouseDown={startDrag} className="absolute top-0 right-0 bottom-0 w-1.5 cursor-ew-resize z-10 hover:bg-accent/20" />
-				{sortedProjects.map((project) => {
-					const isCurrent = currentProjectId === project.id;
-					const letter = project.name.charAt(0).toUpperCase();
-					return (
-						<button
-							key={project.id}
-							type="button"
-							title={project.name}
-							onClick={() => onSelectProject(project.id)}
-							className={cn(
-								"w-8 h-8 rounded-md text-xs font-semibold shrink-0 border-0 cursor-pointer flex items-center justify-center",
-								isCurrent ? "bg-accent text-white" : "bg-surface-3 text-text-secondary hover:text-text-primary hover:bg-surface-4",
-							)}
-						>
-							{letter}
-						</button>
-					);
-				})}
-				<button
-					type="button"
-					title="Add project"
-					onClick={onAddProject}
-					disabled={removingProjectId !== null}
-					className="w-8 h-8 rounded-md text-xs shrink-0 border-0 cursor-pointer flex items-center justify-center bg-transparent text-text-tertiary hover:text-text-secondary hover:bg-surface-2 mt-auto"
-				>
-					<Plus size={16} />
-				</button>
-			</aside>
-		);
-	}
-
-	return (
-		<aside
-			className="flex flex-col min-h-0 overflow-hidden bg-surface-1 relative shrink-0"
-			style={{
-				width: isAgentExpanded ? EXPANDED_PHUONG_WIDTH : sidebarWidth,
-				minWidth: MIN_EXPANDED,
-				maxWidth: isAgentExpanded ? EXPANDED_PHUONG_WIDTH : MAX_WIDTH,
-				borderRight: "1px solid var(--color-divider)",
-				transition: isDragging ? undefined : "width 200ms ease, max-width 200ms ease",
+	const removeProjectDialog = (
+		<AlertDialog
+			open={pendingProjectRemoval !== null}
+			onOpenChange={(open) => {
+				if (!open && !isProjectRemovalPending) {
+					setPendingProjectRemoval(null);
+				}
 			}}
 		>
-			<div onMouseDown={startDrag} className="absolute top-0 right-0 bottom-0 w-1.5 cursor-ew-resize z-10 hover:bg-accent/20" />
+			<AlertDialogHeader>
+				<AlertDialogTitle>Remove Project</AlertDialogTitle>
+			</AlertDialogHeader>
+			<AlertDialogBody>
+				<AlertDialogDescription asChild>
+					<div className="flex flex-col gap-3">
+						<p>{pendingProjectRemoval ? pendingProjectRemoval.name : "This project"}</p>
+						<p className="text-text-primary">
+							This will delete all project tasks ({pendingProjectTaskCount}), remove task
+							workspaces/worktrees, and stop any running processes for this project.
+						</p>
+						<p className="text-text-primary">This action cannot be undone.</p>
+					</div>
+				</AlertDialogDescription>
+			</AlertDialogBody>
+			<AlertDialogFooter>
+				<AlertDialogCancel asChild>
+					<Button
+						variant="default"
+						disabled={isProjectRemovalPending}
+						onClick={() => {
+							if (!isProjectRemovalPending) {
+								setPendingProjectRemoval(null);
+							}
+						}}
+					>
+						Cancel
+					</Button>
+				</AlertDialogCancel>
+				<AlertDialogAction asChild>
+					<Button
+						variant="danger"
+						disabled={isProjectRemovalPending}
+						onClick={async () => {
+							if (!pendingProjectRemoval) {
+								return;
+							}
+							const removed = await onRemoveProject(pendingProjectRemoval.id);
+							if (removed) {
+								setPendingProjectRemoval(null);
+							}
+						}}
+					>
+						{isProjectRemovalPending ? (
+							<>
+								<Spinner size={14} />
+								Removing...
+							</>
+						) : (
+							"Remove Project"
+						)}
+					</Button>
+				</AlertDialogAction>
+			</AlertDialogFooter>
+		</AlertDialog>
+	);
+
+	const expandedSidebarContent = (
+		<>
 			<div style={{ padding: "12px 12px 8px" }}>
 				<div>
 					<div className="font-semibold text-base flex items-baseline gap-1.5">
@@ -216,11 +250,11 @@ export function ProjectNavigationPanel({
 								!canShowAgentSection ? "cursor-not-allowed opacity-50" : null,
 							)}
 						>
-						Phuong
-					</button>
+							Phuong
+						</button>
 					</div>
 				</div>
-				{activeSection === "agent" ? (
+				{activeSection === "agent" && !isMobile ? (
 					<div className="flex items-start gap-2" style={{ padding: "8px 4px 0" }}>
 						<p className="flex-1 text-text-tertiary text-xs">
 							Orchestrate across projects: plan work, route to agent chats. Phuong can read project memory when configured.
@@ -253,14 +287,14 @@ export function ProjectNavigationPanel({
 						{sortedProjects.map((project) => (
 							<ProjectRow
 								key={project.id}
-							project={project}
-							isCurrent={currentProjectId === project.id}
-							removingProjectId={removingProjectId}
-							chats={chatsByProject[project.id] ?? []}
-							selectedTaskId={currentProjectId === project.id ? selectedTaskId : null}
-							onSelect={onSelectProject}
-							onSelectAgentChat={onSelectAgentChat}
-							onCreateNewChat={onCreateNewChat}
+								project={project}
+								isCurrent={currentProjectId === project.id}
+								removingProjectId={removingProjectId}
+								chats={chatsByProject[project.id] ?? []}
+								selectedTaskId={currentProjectId === project.id ? selectedTaskId : null}
+								onSelect={handleProjectSelect}
+								onSelectAgentChat={handleAgentChatSelect}
+								onCreateNewChat={handleNewChat}
 								onRemove={(projectId) => {
 									const found = sortedProjects.find((item) => item.id === projectId);
 									if (!found) {
@@ -284,7 +318,7 @@ export function ProjectNavigationPanel({
 							</button>
 						) : null}
 					</div>
-					<ShortcutsCard />
+					{!isMobile ? <ShortcutsCard /> : null}
 				</>
 			) : (
 				<div className="flex flex-1 min-h-0 flex-col">
@@ -297,70 +331,91 @@ export function ProjectNavigationPanel({
 					</div>
 				</div>
 			)}
-			<AlertDialog
-				open={pendingProjectRemoval !== null}
-				onOpenChange={(open) => {
-					if (!open && !isProjectRemovalPending) {
-						setPendingProjectRemoval(null);
-					}
+		</>
+	);
+
+	if (isMobile) {
+		if (!isMobileOpen) {
+			return <>{removeProjectDialog}</>;
+		}
+		return (
+			<>
+				<div
+					className="kb-mobile-sidebar-backdrop"
+					onClick={onMobileClose}
+					onKeyDown={(e) => { if (e.key === "Escape") onMobileClose?.(); }}
+					role="presentation"
+				/>
+				<aside className="kb-mobile-sidebar flex flex-col min-h-0 overflow-hidden bg-surface-1">
+					{expandedSidebarContent}
+				</aside>
+				{removeProjectDialog}
+			</>
+		);
+	}
+
+	if (isCollapsed) {
+		return (
+			<>
+				<aside
+					className="flex flex-col items-center min-h-0 overflow-hidden bg-surface-1 relative shrink-0 py-2 gap-1.5"
+					style={{
+						width: COLLAPSED_WIDTH,
+						minWidth: COLLAPSED_WIDTH,
+						borderRight: "1px solid var(--color-divider)",
+					}}
+				>
+					<div onMouseDown={startDrag} className="absolute top-0 right-0 bottom-0 w-1.5 cursor-ew-resize z-10 hover:bg-accent/20" />
+					{sortedProjects.map((project) => {
+						const isCurrent = currentProjectId === project.id;
+						const letter = project.name.charAt(0).toUpperCase();
+						return (
+							<button
+								key={project.id}
+								type="button"
+								title={project.name}
+								onClick={() => handleProjectSelect(project.id)}
+								className={cn(
+									"w-8 h-8 rounded-md text-xs font-semibold shrink-0 border-0 cursor-pointer flex items-center justify-center",
+									isCurrent ? "bg-accent text-white" : "bg-surface-3 text-text-secondary hover:text-text-primary hover:bg-surface-4",
+								)}
+							>
+								{letter}
+							</button>
+						);
+					})}
+					<button
+						type="button"
+						title="Add project"
+						onClick={onAddProject}
+						disabled={removingProjectId !== null}
+						className="w-8 h-8 rounded-md text-xs shrink-0 border-0 cursor-pointer flex items-center justify-center bg-transparent text-text-tertiary hover:text-text-secondary hover:bg-surface-2 mt-auto"
+					>
+						<Plus size={16} />
+					</button>
+				</aside>
+				{removeProjectDialog}
+			</>
+		);
+	}
+
+	return (
+		<>
+			<aside
+				className="flex flex-col min-h-0 overflow-hidden bg-surface-1 relative shrink-0"
+				style={{
+					width: isAgentExpanded ? EXPANDED_PHUONG_WIDTH : sidebarWidth,
+					minWidth: MIN_EXPANDED,
+					maxWidth: isAgentExpanded ? EXPANDED_PHUONG_WIDTH : MAX_WIDTH,
+					borderRight: "1px solid var(--color-divider)",
+					transition: isDragging ? undefined : "width 200ms ease, max-width 200ms ease",
 				}}
 			>
-				<AlertDialogHeader>
-					<AlertDialogTitle>Remove Project</AlertDialogTitle>
-				</AlertDialogHeader>
-				<AlertDialogBody>
-					<AlertDialogDescription asChild>
-						<div className="flex flex-col gap-3">
-							<p>{pendingProjectRemoval ? pendingProjectRemoval.name : "This project"}</p>
-							<p className="text-text-primary">
-								This will delete all project tasks ({pendingProjectTaskCount}), remove task
-								workspaces/worktrees, and stop any running processes for this project.
-							</p>
-							<p className="text-text-primary">This action cannot be undone.</p>
-						</div>
-					</AlertDialogDescription>
-				</AlertDialogBody>
-				<AlertDialogFooter>
-					<AlertDialogCancel asChild>
-						<Button
-							variant="default"
-							disabled={isProjectRemovalPending}
-							onClick={() => {
-								if (!isProjectRemovalPending) {
-									setPendingProjectRemoval(null);
-								}
-							}}
-						>
-							Cancel
-						</Button>
-					</AlertDialogCancel>
-					<AlertDialogAction asChild>
-						<Button
-							variant="danger"
-							disabled={isProjectRemovalPending}
-							onClick={async () => {
-								if (!pendingProjectRemoval) {
-									return;
-								}
-								const removed = await onRemoveProject(pendingProjectRemoval.id);
-								if (removed) {
-									setPendingProjectRemoval(null);
-								}
-							}}
-						>
-							{isProjectRemovalPending ? (
-								<>
-									<Spinner size={14} />
-									Removing...
-								</>
-							) : (
-								"Remove Project"
-							)}
-						</Button>
-					</AlertDialogAction>
-				</AlertDialogFooter>
-			</AlertDialog>
-		</aside>
+				<div onMouseDown={startDrag} className="absolute top-0 right-0 bottom-0 w-1.5 cursor-ew-resize z-10 hover:bg-accent/20" />
+				{expandedSidebarContent}
+			</aside>
+			{removeProjectDialog}
+		</>
 	);
 }
 

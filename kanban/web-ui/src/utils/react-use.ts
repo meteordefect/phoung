@@ -5,6 +5,7 @@ import {
 	useEvent as useReactUseEvent,
 	useInterval as useReactUseInterval,
 	useLocalStorage as useReactUseLocalStorage,
+	useMedia as useReactUseMedia,
 	useMeasure as useReactUseMeasure,
 	useTitle as useReactUseTitle,
 	useUnmount as useReactUseUnmount,
@@ -108,4 +109,12 @@ export function useMeasure<T extends Element = Element>() {
 
 export function useUnmount(fn: () => void): void {
 	useReactUseUnmount(fn);
+}
+
+export function useMediaQuery(query: string, defaultState = false): boolean {
+	return useReactUseMedia(query, defaultState);
+}
+
+export function useIsMobile(breakpoint = 768): boolean {
+	return useMediaQuery(`(max-width: ${breakpoint - 1}px)`);
 }
