@@ -30,6 +30,8 @@ interface TaskCountBadge {
 	count: number;
 }
 
+const INITIAL_VISIBLE_CHATS = 4;
+
 export function ProjectNavigationPanel({
 	projects,
 	isLoadingProjects = false,
@@ -548,6 +550,16 @@ function ProjectRow({
 	const hasAnyProjectRemoval = removingProjectId !== null;
 	const [isMenuOpen, setIsMenuOpen] = useState(false);
 	const [isChatsExpanded, setIsChatsExpanded] = useState(true);
+	const [showAllChats, setShowAllChats] = useState(false);
+	const selectedChatIndex = selectedTaskId ? chats.findIndex((chat) => chat.id === selectedTaskId) : -1;
+	const selectedChatHidden = selectedChatIndex >= INITIAL_VISIBLE_CHATS;
+	useEffect(() => {
+		if (selectedChatHidden) {
+			setShowAllChats(true);
+		}
+	}, [selectedChatHidden]);
+	const visibleChats = showAllChats ? chats : chats.slice(0, INITIAL_VISIBLE_CHATS);
+	const hasMoreChats = chats.length > INITIAL_VISIBLE_CHATS;
 	const taskCountBadges: TaskCountBadge[] = [
 		{
 			id: "backlog",
@@ -694,28 +706,45 @@ function ProjectRow({
 								{isChatsExpanded ? <ChevronDown size={10} className="shrink-0" /> : <ChevronRight size={10} className="shrink-0" />}
 								<span>Chats ({chats.length})</span>
 							</button>
-							{isChatsExpanded ? chats.map((chat) => {
-								const isChatSelected = selectedTaskId === chat.id;
-								return (
-									<button
-										key={chat.id}
-										type="button"
-										onClick={(e) => {
-											e.stopPropagation();
-											onSelectAgentChat(project.id, chat.id);
-										}}
-										className={cn(
-											"flex w-full cursor-pointer items-center gap-1.5 rounded-sm px-1.5 py-1 text-left text-xs",
-											isChatSelected
-												? "bg-white/20 text-white"
-												: "text-white/70 hover:bg-white/10 hover:text-white",
-										)}
-									>
-										<MessageSquare size={12} className="shrink-0 opacity-80" />
-										<span className="min-w-0 truncate">{chat.title}</span>
-									</button>
-								);
-							}) : null}
+							{isChatsExpanded ? (
+								<>
+									{visibleChats.map((chat) => {
+										const isChatSelected = selectedTaskId === chat.id;
+										return (
+											<button
+												key={chat.id}
+												type="button"
+												onClick={(e) => {
+													e.stopPropagation();
+													onSelectAgentChat(project.id, chat.id);
+												}}
+												className={cn(
+													"flex w-full cursor-pointer items-center gap-1.5 rounded-sm px-1.5 py-1 text-left text-xs",
+													isChatSelected
+														? "bg-white/20 text-white"
+														: "text-white/70 hover:bg-white/10 hover:text-white",
+												)}
+											>
+												<MessageSquare size={12} className="shrink-0 opacity-80" />
+												<span className="min-w-0 truncate">{chat.title}</span>
+											</button>
+										);
+									})}
+									{hasMoreChats ? (
+										<button
+											type="button"
+											onClick={(e) => {
+												e.stopPropagation();
+												setShowAllChats((prev) => !prev);
+											}}
+											className="flex w-full cursor-pointer items-center gap-1 rounded-sm px-1.5 py-1 text-left text-[10px] text-white/50 hover:text-white/80"
+										>
+											{showAllChats ? <ChevronUp size={10} className="shrink-0" /> : <ChevronDown size={10} className="shrink-0" />}
+											<span>{showAllChats ? "Show less" : `Show all (${chats.length})`}</span>
+										</button>
+									) : null}
+								</>
+							) : null}
 						</>
 					) : null}
 				</div>
