@@ -30,4 +30,19 @@ describe("selectPreferredPhoungModel", () => {
 			id: "claude-sonnet-4-0",
 		});
 	});
+
+	it("prefers GLM-5.1 over GLM-5 when DEFAULT_MODEL is not set", () => {
+		const selected = selectPreferredPhoungModel(
+			[
+				{ provider: "zai", id: "glm-5" },
+				{ provider: "zai", id: "glm-5.1" },
+				{ provider: "zai", id: "glm-4.6" },
+			],
+			"",
+		);
+		expect(selected).toEqual({
+			provider: "zai",
+			id: "glm-5.1",
+		});
+	});
 });

@@ -42,6 +42,8 @@ const HIGH_PRIORITY_MODEL_PATTERNS = [
 	/\bo3\b/i,
 	/gemini[-_]?2\.5[-_]?pro/i,
 	/deepseek[-_]?r1/i,
+	/\bglm[-_]?5(?:\.\d+)?\b/i,
+	/\bglm[-_]?5\.\d+\b/i,
 ];
 
 const LOW_PRIORITY_MODEL_PATTERNS = [
