@@ -5,6 +5,7 @@ import {
 	AuthStorage,
 	ModelRegistry,
 	SettingsManager,
+	getAgentDir,
 	type AgentSession,
 	type AgentSessionEvent,
 } from "@mariozechner/pi-coding-agent";
@@ -59,6 +60,7 @@ async function createPhuongSession(
 
 	const loader = new DefaultResourceLoader({
 		cwd,
+		agentDir: getAgentDir(),
 		systemPromptOverride: () => systemPrompt,
 		agentsFilesOverride: (current) => ({
 			agentsFiles: [

@@ -84,7 +84,7 @@
     "@clinebot/agents": "^0.0.20",
     "@clinebot/core": "^0.0.20",
     "@clinebot/llms": "^0.0.20",
-    "@mariozechner/pi-coding-agent": "^0.65.0",
+    "@mariozechner/pi-coding-agent": "^0.68.1",
     "@modelcontextprotocol/sdk": "^1.27.1",
     "@sentry/node": "^10.45.0",
     "@sinclair/typebox": "^0.34.49",
