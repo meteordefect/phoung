@@ -1,5 +1,9 @@
 # Phuong
 
+<p align="center">
+  <img src="./phuong.png" alt="Phuong dashboard running agent chats" width="100%" />
+</p>
+
 A hosted AI project manager built on a [Kanban](https://github.com/cline/kanban) fork. You chat with Phuong through a secure web dashboard. Phuong plans work, routes to agent chats, and manages project memory. Each project has multiple concurrent `pi` agent chat sessions that run independently on your VPS. Project memory lives in a separate git-backed repository.
 
 ## Status
